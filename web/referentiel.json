@@ -1,0 +1,388 @@
+{
+  "_doc": "Référentiel ASVP Stator. Lu par le serveur Flask (table stat_fields) et par l’interface. Pour ajouter une stat : ajouter un résultat dans outcomes et une ligne dans fields (excel_row peut rester null). Les clés existantes ne doivent pas être renommées : elles identifient les données déjà saisies.",
+  "version": 1,
+  "levels": {
+    "1": "Point ou geste parfait",
+    "2": "Correct, le jeu continue",
+    "3": "Avantage à l’adversaire",
+    "4": "Faute, point perdu"
+  },
+  "roles": [
+    {
+      "key": "central",
+      "label": "Central"
+    },
+    {
+      "key": "r4",
+      "label": "R4"
+    },
+    {
+      "key": "passeur",
+      "label": "Passeur"
+    },
+    {
+      "key": "pointu",
+      "label": "Pointu"
+    },
+    {
+      "key": "libero",
+      "label": "Libéro"
+    }
+  ],
+  "court_positions": [
+    {
+      "n": 4,
+      "label": "Poste 4",
+      "sub": "aile gauche"
+    },
+    {
+      "n": 3,
+      "label": "Poste 3",
+      "sub": "centre"
+    },
+    {
+      "n": 2,
+      "label": "Poste 2",
+      "sub": "aile droite"
+    }
+  ],
+  "skills": [
+    {
+      "key": "service",
+      "label": "Service",
+      "long": "Service",
+      "scope": "Tous tes services.",
+      "rate_text": "Services décisifs ÷ total des services",
+      "rate_name": "services décisifs",
+      "success": [
+        "decisif"
+      ],
+      "excel_rate_row": 7,
+      "outcomes": {
+        "decisif": {
+          "label": "Décisif",
+          "hint": "Ace ou renvoi impossible",
+          "level": 1,
+          "points": 1,
+          "definition": "Service qui marque directement le point ou qui empêche l’équipe adverse de renvoyer le ballon."
+        },
+        "incisif": {
+          "label": "Incisif",
+          "hint": "L’adversaire doit relancer",
+          "level": 2,
+          "points": 0,
+          "definition": "Service réussi qui passe le filet et oblige l’équipe adverse à une simple relance."
+        },
+        "cadeau": {
+          "label": "Cadeau",
+          "hint": "L’adversaire peut attaquer",
+          "level": 3,
+          "points": 0,
+          "definition": "Service réussi qui passe le filet mais laisse l’équipe adverse construire une attaque."
+        },
+        "erreur": {
+          "label": "Erreur",
+          "hint": "Filet ou dehors",
+          "level": 4,
+          "points": -1,
+          "definition": "Service raté : dans le filet ou hors du terrain."
+        }
+      },
+      "fields": [
+        {
+          "key": "decisif",
+          "outcome": "decisif",
+          "court_position": null,
+          "excel_row": 3
+        },
+        {
+          "key": "incisif",
+          "outcome": "incisif",
+          "court_position": null,
+          "excel_row": 4
+        },
+        {
+          "key": "cadeau",
+          "outcome": "cadeau",
+          "court_position": null,
+          "excel_row": 5
+        },
+        {
+          "key": "erreur",
+          "outcome": "erreur",
+          "court_position": null,
+          "excel_row": 6
+        }
+      ]
+    },
+    {
+      "key": "bloc",
+      "label": "Bloc",
+      "long": "Bloc / défense au filet",
+      "scope": "Toutes les attaques adverses face à toi au filet.",
+      "rate_text": "Blocs décisifs ÷ total des situations de bloc",
+      "rate_name": "blocs décisifs",
+      "success": [
+        "decisif"
+      ],
+      "excel_rate_row": 11,
+      "outcomes": {
+        "decisif": {
+          "label": "Décisif",
+          "hint": "Contre gagnant",
+          "level": 1,
+          "points": 1,
+          "definition": "Bloc réussi : il bloque le ballon et marque le point."
+        },
+        "present": {
+          "label": "Présent",
+          "hint": "Ferme une zone, ralentit",
+          "level": 2,
+          "points": 0,
+          "definition": "Bloc (ou défense décollée du bloc) qui ferme une direction d’attaque et force l’attaquant vers l’autre, ou qui ralentit le ballon."
+        },
+        "absent": {
+          "label": "Absent",
+          "hint": "Il fallait sauter",
+          "level": 3,
+          "points": 0,
+          "definition": "Bloc non réalisé alors qu’il aurait fallu au moins gêner l’attaquant."
+        }
+      },
+      "fields": [
+        {
+          "key": "decisif",
+          "outcome": "decisif",
+          "court_position": null,
+          "excel_row": 8
+        },
+        {
+          "key": "present",
+          "outcome": "present",
+          "court_position": null,
+          "excel_row": 9
+        },
+        {
+          "key": "absent",
+          "outcome": "absent",
+          "court_position": null,
+          "excel_row": 10
+        }
+      ]
+    },
+    {
+      "key": "reception",
+      "label": "Réception",
+      "long": "Réception en 1re touche",
+      "scope": "Toutes tes réceptions en première touche : service adverse ou attaque adverse.",
+      "rate_text": "Réceptions réussies ÷ total des réceptions",
+      "rate_name": "réceptions réussies",
+      "success": [
+        "reussie"
+      ],
+      "excel_rate_row": 15,
+      "outcomes": {
+        "reussie": {
+          "label": "Réussie",
+          "hint": "Au centre, passe sereine",
+          "level": 1,
+          "points": 0,
+          "definition": "Réception remise correctement au centre du terrain : le passeur joue sereinement."
+        },
+        "correcte": {
+          "label": "Correcte",
+          "hint": "Rattrapée, passe gênée",
+          "level": 2,
+          "points": 0,
+          "definition": "Réception rattrapée, mais qui ne permet pas une passe sereine derrière."
+        },
+        "erreur": {
+          "label": "Erreur",
+          "hint": "Ballon perdu",
+          "level": 4,
+          "points": -1,
+          "definition": "Réception ratée : pas touchée, ballon qui sort, ou ballon qu’on ne peut plus renvoyer en 3 touches."
+        }
+      },
+      "fields": [
+        {
+          "key": "reussie",
+          "outcome": "reussie",
+          "court_position": null,
+          "excel_row": 12
+        },
+        {
+          "key": "correcte",
+          "outcome": "correcte",
+          "court_position": null,
+          "excel_row": 13
+        },
+        {
+          "key": "erreur",
+          "outcome": "erreur",
+          "court_position": null,
+          "excel_row": 14
+        }
+      ]
+    },
+    {
+      "key": "passe",
+      "label": "Passe",
+      "long": "Passe",
+      "scope": "Toutes tes passes pendant le jeu, selon le poste servi.",
+      "rate_text": "Passes réussies ÷ total des passes",
+      "rate_name": "passes réussies",
+      "success": [
+        "reussie"
+      ],
+      "excel_rate_row": 23,
+      "outcomes": {
+        "reussie": {
+          "label": "Réussie",
+          "hint": "Bien placée pour frapper",
+          "level": 1,
+          "points": 0,
+          "definition": "Passe bien placée pour l’attaquant. Compte aussi une passe correcte après une réception « correcte »."
+        },
+        "moyenne": {
+          "label": "Moyenne",
+          "hint": "Imprécise, on relance",
+          "level": 3,
+          "points": 0,
+          "definition": "Passe qui oblige à relancer, faute de précision ou de hauteur pour l’attaque."
+        },
+        "erreur": {
+          "label": "Erreur",
+          "hint": "Pas d’attaque ou faute",
+          "level": 4,
+          "points": -1,
+          "definition": "Passe ratée qui ne permet pas l’attaque, ou faute directe : le point est perdu."
+        }
+      },
+      "fields": [
+        {
+          "key": "reussie_p2",
+          "outcome": "reussie",
+          "court_position": 2,
+          "excel_row": 16
+        },
+        {
+          "key": "reussie_p3",
+          "outcome": "reussie",
+          "court_position": 3,
+          "excel_row": 17
+        },
+        {
+          "key": "reussie_p4",
+          "outcome": "reussie",
+          "court_position": 4,
+          "excel_row": 18
+        },
+        {
+          "key": "moyenne_p2",
+          "outcome": "moyenne",
+          "court_position": 2,
+          "excel_row": 19
+        },
+        {
+          "key": "moyenne_p3",
+          "outcome": "moyenne",
+          "court_position": 3,
+          "excel_row": 20
+        },
+        {
+          "key": "moyenne_p4",
+          "outcome": "moyenne",
+          "court_position": 4,
+          "excel_row": 21
+        },
+        {
+          "key": "erreur",
+          "outcome": "erreur",
+          "court_position": null,
+          "excel_row": 22
+        }
+      ]
+    },
+    {
+      "key": "attaque",
+      "label": "Attaque",
+      "long": "Attaque",
+      "scope": "Toutes tes attaques : frappe, poussée à dix doigts ou petite bidouille, en 2e ou 3e touche (voire en 1re sur une relance).",
+      "rate_text": "Attaques décisives ÷ total des attaques",
+      "rate_name": "attaques décisives",
+      "success": [
+        "decisive"
+      ],
+      "excel_rate_row": 30,
+      "outcomes": {
+        "decisive": {
+          "label": "Décisive",
+          "hint": "Point ou renvoi impossible",
+          "level": 1,
+          "points": 1,
+          "definition": "Attaque qui marque directement le point ou qui empêche l’équipe adverse de renvoyer le ballon."
+        },
+        "incisive": {
+          "label": "Incisive",
+          "hint": "L’adversaire doit relancer",
+          "level": 2,
+          "points": 0,
+          "definition": "Attaque qui passe sans point ni faute et qui oblige l’équipe adverse à une simple relance."
+        },
+        "cadeau": {
+          "label": "Cadeau",
+          "hint": "L’adversaire contre-attaque",
+          "level": 3,
+          "points": 0,
+          "definition": "Attaque qui passe sans point ni faute mais laisse l’équipe adverse attaquer."
+        },
+        "erreur": {
+          "label": "Erreur",
+          "hint": "Dehors ou filet",
+          "level": 4,
+          "points": -1,
+          "definition": "Attaque ratée : dehors ou dans le filet."
+        }
+      },
+      "fields": [
+        {
+          "key": "decisive_p2",
+          "outcome": "decisive",
+          "court_position": 2,
+          "excel_row": 24
+        },
+        {
+          "key": "decisive_p3",
+          "outcome": "decisive",
+          "court_position": 3,
+          "excel_row": 25
+        },
+        {
+          "key": "decisive_p4",
+          "outcome": "decisive",
+          "court_position": 4,
+          "excel_row": 26
+        },
+        {
+          "key": "incisive",
+          "outcome": "incisive",
+          "court_position": null,
+          "excel_row": 27
+        },
+        {
+          "key": "cadeau",
+          "outcome": "cadeau",
+          "court_position": null,
+          "excel_row": 28
+        },
+        {
+          "key": "erreur",
+          "outcome": "erreur",
+          "court_position": null,
+          "excel_row": 29
+        }
+      ]
+    }
+  ]
+}
