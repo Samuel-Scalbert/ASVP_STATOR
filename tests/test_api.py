@@ -11,6 +11,7 @@ FICHE = {
 def test_page_and_static_files(client):
     page = client.get("/")
     assert page.status_code == 200 and b"<!doctype html>" in page.data and b"ASVP Stator" in page.data
+    assert b"js/app.js?v=" in page.data and page.headers["Cache-Control"] == "no-cache"  # pas de vieux scripts en cache
     assert client.get("/js/core.js").status_code == 200
     assert client.get("/referentiel.json").status_code == 200
     assert client.get("/stator/models.py").status_code == 404

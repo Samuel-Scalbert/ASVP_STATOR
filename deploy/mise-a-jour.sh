@@ -50,8 +50,10 @@ main() {
   fi
 
   echo
-  echo "Version en ligne : $(cat VERSION) · commit $(git log -1 --format='%h du %cs : %s')"
-  echo "Elle doit correspondre au dernier commit affiché sur GitHub."
+  echo "Version installée : $(cat VERSION) · commit $(git log -1 --format='%h du %cs : %s')"
+  echo "Vérifie sur le site (en bas du menu à gauche) que la même version s'affiche."
+  echo "Sinon : onglet Web › bouton vert « Reload », puis recharge la page du site."
+  echo "Inutile de lancer « flask run » ici : le site est servi par l'onglet Web."
 }
 
 main "$@"

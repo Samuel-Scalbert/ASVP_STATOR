@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -88,7 +89,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.get("/")
     def index():
         page = (WEB_DIR / "index.html").read_text(encoding="utf-8")
-        return Response(SKELETON.replace("{page}", page), mimetype="text/html")
+        # Les scripts changent d'adresse à chaque version : un navigateur ne peut pas garder l'ancienne en cache.
+        v = app.config["STATOR_VERSION"]
+        tag = v.get("commit") or v.get("version") or "dev"
+        page = re.sub(r'(src="js/[^"?]+\.js)"', rf'\1?v={tag}"', page)
+        resp = Response(SKELETON.replace("{page}", page), mimetype="text/html")
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
     @app.get("/<path:path>")
     def web_file(path: str):
