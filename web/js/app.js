@@ -11,6 +11,7 @@
 
   const NAV = [
     { view: "home", label: "Matchs", icon: "cal", hash: "matchs" },
+    { view: "newmatch", label: "Nouveau match", short: "Nouveau", icon: "plus", hash: "nouveau" },
     { view: "season", label: "Saison", icon: "chart", hash: "saison" },
     { view: "tuto", label: "Tuto", icon: "book", hash: "tuto" },
     { view: "team", label: "Équipe", icon: "users", hash: "equipe" },
@@ -118,7 +119,8 @@
       body = html`<${root.StatorEntry.Entry} key=${route.matchId} matchId=${route.matchId} playerId=${pid} go=${go} onHelp=${(sk) => setSheet({ type: "help", sk })} />`;
     } else if (view === "match") {
       body = html`<${M.MatchView} matchId=${route.matchId} me=${meValid} go=${go} openSheet=${openSheet} sub=${sub} setSub=${setSub} />`;
-    } else if (view === "season") body = html`<${S.Season} go=${go} />`;
+    } else if (view === "newmatch") body = html`<${M.NewMatch} go=${go} />`;
+    else if (view === "season") body = html`<${S.Season} go=${go} />`;
     else if (view === "tuto" || view === "guide") body = html`<${root.StatorTuto.Tuto} anchor=${route.anchor} />`;
     else if (view === "team") body = html`<${S.Team} go=${go} openSheet=${openSheet} me=${meValid} />`;
     else body = html`<${M.Home} me=${meValid} go=${go} openSheet=${openSheet} />`;
@@ -171,7 +173,7 @@
         <${Boundary} key=${view + (route.matchId || "")} onReset=${() => go({ view: "home" })}>${body}<//>
       </main>
       ${view !== "entry" && html`<nav class="tabbar" aria-label="Sections">
-        ${NAV.map((n) => html`<button key=${n.view} class=${cx("tab", active === n.view && "on")} aria-current=${active === n.view ? "page" : null} onClick=${() => go({ view: n.view })}><${Icon} name=${n.icon} size=${22} /><span>${n.label}</span></button>`)}
+        ${NAV.map((n) => html`<button key=${n.view} class=${cx("tab", active === n.view && "on")} aria-current=${active === n.view ? "page" : null} onClick=${() => go({ view: n.view })}><${Icon} name=${n.icon} size=${22} /><span>${n.short || n.label}</span></button>`)}
       </nav>`}
       ${sheetEl}
       <${Toasts} />

@@ -40,7 +40,7 @@
       <div class="steps-head"><h2 class="h-sec">Comment ça marche</h2>
         <button class="icon-btn" onClick=${onClose} aria-label="Masquer l’explication"><${Icon} name="x" size=${18} /></button></div>
       <ol>
-        <li><b>Ouvre le match.</b> Le dernier est en haut. S’il n’existe pas encore, crée-le en 20 secondes.</li>
+        <li><b>Ouvre le match.</b> Le dernier est en haut. S’il n’existe pas encore, crée-le dans l’onglet « Nouveau match ».</li>
         <li><b>Compte tes actions, set par set.</b> Une touche par action. Chaque case est expliquée.</li>
         <li><b>Écris ton bilan.</b> Deux lignes perso, deux lignes collectif. Totaux et taux se calculent seuls.</li>
       </ol>
@@ -107,7 +107,7 @@
           <h2 class="h-sec">Tous les matchs</h2>
           <div class="row-btns">
             ${!store.readOnly && html`<button class="btn ghost sm" onClick=${() => openSheet({ type: "import" })}><${Icon} name="up" size=${16} />Importer</button>`}
-            ${!store.readOnly && html`<button class="btn dark sm" onClick=${() => openSheet({ type: "match-form" })}><${Icon} name="plus" size=${16} />Nouveau match</button>`}
+            ${!store.readOnly && html`<button class="btn dark sm" onClick=${() => go({ view: "newmatch" })}><${Icon} name="plus" size=${16} />Nouveau match</button>`}
           </div>
         </div>
         <ul class="match-list">
@@ -126,14 +126,20 @@
     </div></div>`;
   }
 
-  /* ---------- Formulaire de match ---------- */
-  function MatchForm({ m, onDone }) {
+  /* ---------- Formulaire de match (création et modification) ---------- */
+  function MatchForm({ m, preset, onDone }) {
     const editing = !!m;
-    const [opp, setOpp] = useState(m ? m.opponent : "");
+    const p = preset || {};
+    const roster = q.roster();
+    const activeIds = q.active().map((x) => x.id);
+    const past = q.matchList().filter((x) => !m || x.id !== m.id);
+    const lastSquad = past.length && Array.isArray(past[0].squad) && past[0].squad.length ? past[0].squad : null;
+    const [opp, setOpp] = useState(m ? m.opponent : p.opponent || "");
     const [date, setDate] = useState(m ? m.date || "" : new Date().toISOString().slice(0, 10));
-    const [venue, setVenue] = useState(m ? m.venue || "" : "dom");
-    const [comp, setComp] = useState(m ? m.competition || "" : "");
+    const [venue, setVenue] = useState(m ? m.venue || "" : p.venue != null ? p.venue : "dom");
+    const [comp, setComp] = useState(m ? m.competition || "" : p.competition || "");
     const [video, setVideo] = useState(m ? m.video || "" : "");
+    const [squad, setSquad] = useState(() => (m && Array.isArray(m.squad) && m.squad.length ? m.squad.slice() : activeIds));
     const init = C.matchSets(m || {});
     const [rows, setRows] = useState(() => [0, 1, 2, 3, 4].map((i) => (init[i] ? { a: String(init[i].a), o: String(init[i].o) } : { a: "", o: "" })));
     const r0 = m && m.result ? m.result : null;
@@ -142,21 +148,44 @@
     const [err, setErr] = useState("");
     const sets = rows.map((x) => ({ a: parseInt(x.a, 10), o: parseInt(x.o, 10) })).filter((x) => Number.isFinite(x.a) && Number.isFinite(x.o));
     const fromSets = sets.length ? C.matchResult({ sets }) : null;
+    // Joueurs proposés : l’effectif actif, plus ceux d’un ancien match qui ont été retirés depuis.
+    const choices = roster.filter((x) => x.active !== false || squad.indexOf(x.id) >= 0);
+    const uniq = (arr) => arr.filter((v, i) => v && arr.findIndex((w) => C.norm(w) === C.norm(v)) === i);
+    const opponents = uniq(past.map((x) => x.opponent));
+    const competitions = uniq(["Championnat", "Coupe", "Amical"].concat(past.map((x) => x.competition)));
+    const toggle = (id) => setSquad(squad.indexOf(id) >= 0 ? squad.filter((x) => x !== id) : squad.concat([id]));
     const submit = (e) => {
       e.preventDefault();
       if (!opp.trim()) { setErr("Indique le nom de l’adversaire."); return; }
+      if (choices.length && !squad.length) { setErr("Coche au moins un joueur du match."); return; }
       if (video.trim() && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
       const res = fromSets ? null : (Number.isFinite(parseInt(ra, 10)) && Number.isFinite(parseInt(ro, 10)) ? { a: parseInt(ra, 10), o: parseInt(ro, 10) } : null);
+      const order = roster.map((x) => x.id);
       const doc = Object.assign({}, m || { id: C.uid("m-"), createdAt: new Date().toISOString() }, {
-        opponent: opp.trim(), date, venue, competition: comp.trim(), video: video.trim(), sets, result: res, updatedAt: new Date().toISOString(),
+        opponent: opp.trim(), date, venue, competition: comp.trim(), video: video.trim(), sets, result: res,
+        squad: squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
       });
       api.saveMatch(doc);
       onDone(doc, !editing);
     };
     const setRow = (i, k, v) => setRows(rows.map((x, j) => (j === i ? Object.assign({}, x, { [k]: v.replace(/[^0-9]/g, "").slice(0, 2) }) : x)));
+    const scoreFields = html`
+      <div class="sets-grid">
+        <span></span><span class="sg-h">ASVP</span><span class="sg-h">${opp.trim() || "Adv."}</span>
+        ${rows.map((x, i) => html`<span class="sg-l" key=${"l" + i}>Set ${i + 1}</span>
+          <input key=${"a" + i} id=${"f-s" + i + "a"} inputmode="numeric" aria-label=${"Set " + (i + 1) + " ASVP"} value=${x.a} onInput=${(e) => setRow(i, "a", e.target.value)} />
+          <input key=${"o" + i} id=${"f-s" + i + "o"} inputmode="numeric" aria-label=${"Set " + (i + 1) + " adversaire"} value=${x.o} onInput=${(e) => setRow(i, "o", e.target.value)} />`)}
+      </div>
+      ${fromSets ? html`<p class="muted">Résultat calculé : ASVP ${fromSets.a}–${fromSets.o}</p>` : html`
+        <div class="field"><span class="lbl"><b>Résultat en sets</b><small>Si tu n’as pas le détail des sets</small></span>
+          <div class="res-inputs">
+            <span>ASVP</span><input id="f-ra" inputmode="numeric" aria-label="Sets gagnés par ASVP" value=${ra} onInput=${(e) => setRa(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} />
+            <span>–</span><input id="f-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>${opp.trim() || "Adv."}</span>
+          </div></div>`}`;
     return html`<form class="form" onSubmit=${submit}>
       <div class="field"><label for="f-opp"><b>Adversaire</b></label>
-        <input id="f-opp" data-autofocus value=${opp} onInput=${(e) => { setOpp(e.target.value); setErr(""); }} placeholder="Nom du club adverse" autocomplete="off" /></div>
+        <input id="f-opp" data-autofocus list="f-opp-list" value=${opp} onInput=${(e) => { setOpp(e.target.value); setErr(""); }} placeholder="Nom du club adverse" autocomplete="off" />
+        <datalist id="f-opp-list">${opponents.map((o) => html`<option key=${o} value=${o}></option>`)}</datalist></div>
       <div class="field-row">
         <div class="field"><label for="f-date"><b>Date</b></label><input id="f-date" type="date" value=${date} onInput=${(e) => setDate(e.target.value)} /></div>
         <div class="field"><span class="lbl"><b>Lieu</b></span>
@@ -165,28 +194,84 @@
           </div></div>
       </div>
       <div class="field"><label for="f-comp"><b>Compétition</b><small>Facultatif</small></label>
-        <input id="f-comp" value=${comp} onInput=${(e) => setComp(e.target.value)} placeholder="Ex. : Championnat, Coupe" /></div>
+        <input id="f-comp" list="f-comp-list" value=${comp} onInput=${(e) => setComp(e.target.value)} placeholder="Ex. : Championnat, Coupe" autocomplete="off" />
+        <datalist id="f-comp-list">${competitions.map((o) => html`<option key=${o} value=${o}></option>`)}</datalist></div>
+      ${choices.length ? html`<fieldset class="field">
+        <legend><b>Joueurs du match</b><small>${squad.length} sur ${choices.length} · ce sont eux qui remplissent une fiche</small></legend>
+        <div class="row-btns">
+          <button type="button" class="btn ghost sm" onClick=${() => setSquad(activeIds)}>Tout l’effectif</button>
+          ${lastSquad && html`<button type="button" class="btn ghost sm" onClick=${() => setSquad(lastSquad.slice())}>Comme au dernier match</button>`}
+          <button type="button" class="btn ghost sm" onClick=${() => setSquad([])}>Personne</button>
+        </div>
+        <div class="squad-grid">
+          ${choices.map((x) => { const on = squad.indexOf(x.id) >= 0; return html`<button type="button" key=${x.id} class=${cx("squad-chip", on && "on")} aria-pressed=${on} onClick=${() => { toggle(x.id); setErr(""); }}>
+            <span class="squad-box" aria-hidden="true">${on ? html`<${Icon} name="check" size=${14} />` : null}</span>
+            <span class="squad-name">${x.name}${q.posteLabel(x.id) ? html`<small>${q.posteLabel(x.id)}</small>` : null}</span></button>`; })}
+        </div>
+      </fieldset>` : html`<p class="muted small">L’effectif est vide : ajoute les joueurs dans l’onglet Équipe pour choisir qui joue ce match.</p>`}
       <div class="field"><label for="f-video"><b>Vidéo YouTube du match</b><small>Facultatif : colle le lien de la vidéo</small></label>
         <input id="f-video" type="url" inputmode="url" value=${video} onInput=${(e) => { setVideo(e.target.value); setErr(""); }} placeholder="https://youtu.be/…" autocomplete="off" />
         ${video.trim() && /^https?:\/\//i.test(video.trim()) && !U.youtubeEmbed(video) ? html`<small class="warn">Ce lien n’est pas reconnu comme une vidéo YouTube : il s’ouvrira simplement dans un nouvel onglet.</small>` : null}</div>
-      <fieldset class="field">
-        <legend><b>Score des sets</b><small>Facultatif, mais il permet de vérifier les stats saisies.</small></legend>
-        <div class="sets-grid">
-          <span></span><span class="sg-h">ASVP</span><span class="sg-h">${opp.trim() || "Adv."}</span>
-          ${rows.map((x, i) => html`<span class="sg-l" key=${"l" + i}>Set ${i + 1}</span>
-            <input key=${"a" + i} id=${"f-s" + i + "a"} inputmode="numeric" aria-label=${"Set " + (i + 1) + " ASVP"} value=${x.a} onInput=${(e) => setRow(i, "a", e.target.value)} />
-            <input key=${"o" + i} id=${"f-s" + i + "o"} inputmode="numeric" aria-label=${"Set " + (i + 1) + " adversaire"} value=${x.o} onInput=${(e) => setRow(i, "o", e.target.value)} />`)}
-        </div>
-      </fieldset>
-      ${fromSets ? html`<p class="muted">Résultat calculé : ASVP ${fromSets.a}–${fromSets.o}</p>` : html`
-        <div class="field"><span class="lbl"><b>Résultat en sets</b><small>Si tu n’as pas le détail des sets</small></span>
-          <div class="res-inputs">
-            <span>ASVP</span><input id="f-ra" inputmode="numeric" aria-label="Sets gagnés par ASVP" value=${ra} onInput=${(e) => setRa(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} />
-            <span>–</span><input id="f-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>${opp.trim() || "Adv."}</span>
-          </div></div>`}
+      ${editing || sets.length || ra || ro
+        ? html`<fieldset class="field"><legend><b>Score des sets</b><small>Facultatif, mais il permet de vérifier les stats saisies.</small></legend>${scoreFields}</fieldset>`
+        : html`<details class="score-later"><summary>Le match est déjà joué ? Renseigner le score</summary>
+            <p class="muted small">Sinon, tu pourras l’ajouter après le match avec le bouton « Modifier ».</p>${scoreFields}</details>`}
       ${err && html`<p class="form-err" role="alert">${err}</p>`}
       <div class="row-btns end"><button class="btn primary" type="submit">${editing ? "Enregistrer le match" : "Créer le match"}</button></div>
     </form>`;
+  }
+
+  /* ---------- Onglet « Nouveau match » : un modèle, puis les infos du match ---------- */
+  function NewMatch({ go }) {
+    const [tpl, setTpl] = useState("libre");
+    const past = q.matchList();
+    const flip = (v) => (v === "dom" ? "ext" : v === "ext" ? "dom" : "");
+    const placeLabel = (v) => (v === "dom" ? "à domicile" : v === "ext" ? "à l’extérieur" : "lieu à choisir");
+    const templates = [
+      { k: "libre", label: "Sans modèle", sub: "Tout est à remplir", preset: {} },
+      { k: "champ-dom", label: "Championnat à domicile", sub: "Compétition et lieu déjà remplis", preset: { competition: "Championnat", venue: "dom" } },
+      { k: "champ-ext", label: "Championnat à l’extérieur", sub: "Compétition et lieu déjà remplis", preset: { competition: "Championnat", venue: "ext" } },
+      { k: "coupe", label: "Coupe", sub: "Compétition déjà remplie", preset: { competition: "Coupe", venue: "" } },
+      { k: "amical", label: "Match amical", sub: "Compétition déjà remplie", preset: { competition: "Amical", venue: "" } },
+    ];
+    // Matchs retour : un adversaire rencontré une seule fois, avec le lieu inversé.
+    const seen = {};
+    past.forEach((x) => { const k = C.norm(x.opponent); seen[k] = (seen[k] || 0) + 1; });
+    const retours = [];
+    past.forEach((x) => {
+      const k = C.norm(x.opponent);
+      if (seen[k] !== 1 || retours.length >= 4) return;
+      retours.push({ k: "retour-" + x.id, label: "Retour contre " + x.opponent, sub: (x.competition || "Match") + " · " + placeLabel(flip(x.venue)),
+        preset: { opponent: x.opponent, competition: x.competition || "", venue: flip(x.venue) } });
+    });
+    const all = templates.concat(retours);
+    const cur = all.find((t) => t.k === tpl) || all[0];
+    if (store.readOnly) {
+      return html`<div class="page"><p class="notice ro">Tu consultes l’app en lecture seule : tu ne peux pas créer de match.</p></div>`;
+    }
+    return html`<div class="page wide">
+      <div class="tuto-head">
+        <span class="eyebrow">Nouveau match</span>
+        <h1 class="h-page">Créer un match</h1>
+        <p class="lead">Choisis un modèle pour gagner du temps, complète les infos, puis chaque joueur du match remplit sa fiche.</p>
+      </div>
+      <div class="newmatch-grid">
+        <section class="card">
+          <h2 class="h-sec">1. Modèle</h2>
+          <div class="tpl-list" role="radiogroup" aria-label="Modèle de match">
+            ${templates.map((t) => html`<button type="button" key=${t.k} role="radio" aria-checked=${cur.k === t.k} class=${cx("tpl", cur.k === t.k && "on")} onClick=${() => setTpl(t.k)}><b>${t.label}</b><small>${t.sub}</small></button>`)}
+          </div>
+          ${retours.length ? html`<h3 class="h-sub">Matchs retour</h3>
+            <div class="tpl-list" role="radiogroup" aria-label="Matchs retour">
+              ${retours.map((t) => html`<button type="button" key=${t.k} role="radio" aria-checked=${cur.k === t.k} class=${cx("tpl", cur.k === t.k && "on")} onClick=${() => setTpl(t.k)}><b>${t.label}</b><small>${t.sub}</small></button>`)}
+            </div>` : null}
+        </section>
+        <section class="card">
+          <h2 class="h-sec">2. Infos du match</h2>
+          <${MatchForm} key=${cur.k} preset=${cur.preset} onDone=${(doc) => { U.toast("Match créé : ASVP – " + doc.opponent + "."); go({ view: "match", matchId: doc.id }); }} />
+        </section>
+      </div>
+    </div>`;
   }
 
   /* ---------- Aide d’une compétence ---------- */
@@ -493,5 +578,5 @@
     </div>`;
   }
 
-  root.StatorMatch = { Home, MatchView, MatchForm, SkillHelp, WhoGrid, PlayerDetail, DeleteMatch, venueLabel, ResultChip };
+  root.StatorMatch = { Home, MatchView, MatchForm, NewMatch, SkillHelp, WhoGrid, PlayerDetail, DeleteMatch, venueLabel, ResultChip };
 })(window);

@@ -153,9 +153,14 @@
     const tabs = [];
     for (let i = 1; i <= nSets; i++) tabs.push(i);
     const nextTab = !onSet ? null : tab < nSets ? tab + 1 : "bilan";
-    const players = q.active();
-    const idx = players.findIndex((p) => p.id === playerId);
-    const nextPlayer = idx >= 0 && idx < players.length - 1 ? players[idx + 1] : null;
+    // Joueurs du match d’abord ; les autres restent accessibles en cas d’oubli dans la liste.
+    const squadIds = q.squadOf(matchId);
+    const inMatch = squadIds ? q.roster().filter((p) => squadIds.indexOf(p.id) >= 0) : q.active();
+    const others = squadIds ? q.active().filter((p) => squadIds.indexOf(p.id) < 0) : [];
+    const players = inMatch.concat(others);
+    const idx = inMatch.findIndex((p) => p.id === playerId);
+    const nextPlayer = idx >= 0 && idx < inMatch.length - 1 ? inMatch[idx + 1] : null;
+    const opt = (p) => html`<option key=${p.id} value=${p.id}>${p.name}${q.posteLabel(p.id) ? " · " + q.posteLabel(p.id) : ""}</option>`;
     const poste = q.posteLabel(playerId);
 
     return html`<div class="entry-inner">
@@ -168,7 +173,9 @@
               <span class="sr-only">Joueur</span>
               <select id="entry-player" value=${playerId} onChange=${(e) => onSwitch(e.target.value)}>
                 ${players.some((p) => p.id === playerId) ? null : html`<option value=${playerId}>${q.name(playerId)}</option>`}
-                ${players.map((p) => html`<option key=${p.id} value=${p.id}>${p.name}${q.posteLabel(p.id) ? " · " + q.posteLabel(p.id) : ""}</option>`)}
+                ${others.length
+                  ? html`<optgroup label="Joueurs du match">${inMatch.map(opt)}</optgroup><optgroup label="Autres joueurs">${others.map(opt)}</optgroup>`
+                  : inMatch.map(opt)}
               </select>
             </label>
           </div>

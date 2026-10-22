@@ -70,3 +70,10 @@ def test_version_is_exposed(client):
     health = client.get("/api/health").get_json()
     assert health["ok"] is True and health["version"]
     assert client.get("/api/state").get_json()["app"]["version"] == health["version"]
+
+
+def test_match_squad(team):
+    r = team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "squad": ["joueur-a", "joueur-b", "joueur-a"]})
+    assert r.status_code == 200
+    assert team.get("/api/state").get_json()["matches"]["m-exemple"]["squad"] == ["joueur-a", "joueur-b"]
+    assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "squad": "joueur-a"}).status_code == 400

@@ -275,10 +275,17 @@
     },
     statsOf(matchId) { return Object.values(store.stats).filter((d) => d && d.matchId === matchId); },
     doc(matchId, playerId) { return store.stats[C.statId(matchId, playerId)] || null; },
-    /* Joueurs du match : l’effectif actif, plus ceux qui ont saisi puis ont été retirés. */
+    /* Joueurs retenus pour le match (null = pas de liste : tout l’effectif actif). */
+    squadOf(matchId) {
+      const m = store.matches[matchId];
+      return m && Array.isArray(m.squad) && m.squad.length ? m.squad : null;
+    },
+    /* Joueurs du match : ceux retenus (ou l’effectif actif), plus ceux qui ont une fiche malgré tout. */
     playersOf(matchId) {
       const docs = q.statsOf(matchId);
-      const list = q.active().map((p) => ({ id: p.id, name: p.name, doc: docs.find((d) => d.playerId === p.id) || null }));
+      const squad = q.squadOf(matchId);
+      const base = squad ? q.roster().filter((p) => squad.indexOf(p.id) >= 0) : q.active();
+      const list = base.map((p) => ({ id: p.id, name: p.name, doc: docs.find((d) => d.playerId === p.id) || null }));
       docs.forEach((d) => { if (!list.some((x) => x.id === d.playerId)) list.push({ id: d.playerId, name: q.name(d.playerId), doc: d }); });
       return list;
     },

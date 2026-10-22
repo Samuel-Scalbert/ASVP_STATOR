@@ -134,7 +134,7 @@
             <h2 class="h-sec"><span class="sec-n">1</span>Le principe</h2>
             <p>Après chaque match, on remplit une <b>fiche par joueur</b> : ce qu’il a fait à chaque geste (service, bloc, réception, passe, attaque), <b>set par set</b>, puis un court bilan. L’app additionne et calcule tout le reste : points marqués, fautes, taux de transformation, tableaux de l’équipe et de la saison.</p>
             <ol class="howto">
-              <li><b>Ouvre le match</b> (onglet Matchs), puis « Saisir les stats ».</li>
+              <li><b>Ouvre le match</b> (onglet Matchs), puis « Saisir les stats ». S’il n’existe pas encore, crée-le dans l’onglet « Nouveau match ».</li>
               <li><b>Compte les actions</b> de chaque joueur, set par set : une touche = une action.</li>
               <li><b>Écris le bilan</b> : les + et les − pour soi, puis pour l’équipe.</li>
             </ol>
@@ -218,6 +218,7 @@
             <h2 class="h-sec"><span class="sec-n">5</span>Lire les écrans</h2>
             <dl class="calc">
               <dt>Matchs</dt><dd>Le dernier match en grand, avec le nombre de fiches remplies, puis la liste de tous les matchs.</dd>
+              <dt>Nouveau match</dt><dd>Créer un match à partir d’un modèle (championnat à domicile ou à l’extérieur, coupe, amical, match retour), puis cocher les joueurs du match : seuls eux comptent dans le suivi des saisies.</dd>
               <dt>Match › Synthèse</dt><dd>Qui a rempli sa fiche, les points et fautes de l’équipe, les taux par geste, d’où viennent les points de chaque set, et ce qu’on laisse à l’adversaire.</dd>
               <dt>Match › Joueurs</dt><dd>Le classement des joueurs (points, fautes, différence) et leurs taux, pour le match entier ou un set. Plus bas, « Détail set par set » montre un tableau joueurs × sets, comme les feuilles STATS de l’Excel.</dd>
               <dt>Match › Bilans</dt><dd>Tous les bilans collectifs (les + et les −) regroupés, puis les bilans perso de chaque joueur.</dd>

@@ -57,6 +57,8 @@ def _upgrade_schema() -> None:
     with db.engine.begin() as conn:
         if "video_url" not in columns:
             conn.execute(text("ALTER TABLE matches ADD COLUMN video_url VARCHAR(300) DEFAULT ''"))
+        if "squad" not in columns:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN squad TEXT DEFAULT ''"))
         for view in ("v_player_match", "v_player_skill", "v_stats_detail"):  # vues d'analyse retirées
             conn.execute(text(f"DROP VIEW IF EXISTS {view}"))
 
