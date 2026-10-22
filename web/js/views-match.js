@@ -156,7 +156,7 @@
     const setRow = (i, k, v) => setRows(rows.map((x, j) => (j === i ? Object.assign({}, x, { [k]: v.replace(/[^0-9]/g, "").slice(0, 2) }) : x)));
     return html`<form class="form" onSubmit=${submit}>
       <div class="field"><label for="f-opp"><b>Adversaire</b></label>
-        <input id="f-opp" data-autofocus value=${opp} onInput=${(e) => { setOpp(e.target.value); setErr(""); }} placeholder="Ex. : Dunois" autocomplete="off" /></div>
+        <input id="f-opp" data-autofocus value=${opp} onInput=${(e) => { setOpp(e.target.value); setErr(""); }} placeholder="Nom du club adverse" autocomplete="off" /></div>
       <div class="field-row">
         <div class="field"><label for="f-date"><b>Date</b></label><input id="f-date" type="date" value=${date} onInput=${(e) => setDate(e.target.value)} /></div>
         <div class="field"><span class="lbl"><b>Lieu</b></span>

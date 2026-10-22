@@ -9,9 +9,11 @@ son onglet pour la coller dans l'Excel du coach (marche à suivre dans le Tuto d
 
 ## Aperçu
 
-| Saisie d'une fiche, avec la vidéo du match | Synthèse d'un match |
+Captures réalisées avec des données fictives (joueurs, adversaires et stats inventés).
+
+| Saisie d'une fiche | Synthèse d'un match |
 |---|---|
-| ![Saisie](docs/screenshots/02-saisie-avec-video.png) | ![Synthèse](docs/screenshots/03-match-synthese.png) |
+| ![Saisie](docs/screenshots/02-saisie.png) | ![Synthèse](docs/screenshots/03-match-synthese.png) |
 
 | Accueil | Joueurs et détail set par set |
 |---|---|

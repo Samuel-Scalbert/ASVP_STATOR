@@ -251,7 +251,7 @@
             <p>Tant que le coach garde son fichier, chaque joueur peut y recopier sa fiche de l’app en <b>deux copier-coller</b>. La fiche téléchargée reprend exactement l’onglet du joueur chez le coach : mêmes lignes, mêmes colonnes, mêmes formules. Il suffit de coller au même endroit.</p>
             <${SheetMap} />
             <ol class="howto steps-coach">
-              <li><b>Télécharge la fiche.</b> À la fin de la saisie, onglet <i>Bilan</i> › « Télécharger la fiche Excel ». Le coach peut aussi la télécharger depuis <i>Match › Joueurs</i>, en touchant le nom du joueur. Le fichier s’appelle par exemple « ASVP - Dunois - Samuel.xlsx ».</li>
+              <li><b>Télécharge la fiche.</b> À la fin de la saisie, onglet <i>Bilan</i> › « Télécharger la fiche Excel ». Le coach peut aussi la télécharger depuis <i>Match › Joueurs</i>, en touchant le nom du joueur. Le fichier s’appelle par exemple « ASVP - Adversaire - Prénom.xlsx ».</li>
               <li><b>Ouvre les deux fichiers</b> : la fiche téléchargée et l’Excel du coach, sur Excel ou sur Google Sheets.</li>
               <li><b>Copie les stats.</b> Dans la fiche, sélectionne les cases <code>E3</code> à <code>I30</code>. Le plus simple : tape <code>E3:I30</code> dans la zone Nom (en haut à gauche, à côté de la barre de formule), puis Entrée. Copie avec Ctrl+C (Cmd+C sur Mac).</li>
               <li><b>Colle chez le coach, sans la mise en forme.</b> Ouvre l’onglet à ton nom, clique sur la case <code>E3</code>, puis :

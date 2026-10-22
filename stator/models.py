@@ -32,7 +32,7 @@ class Setting(db.Model):
 
 class Player(db.Model):
     __tablename__ = "players"
-    id: Mapped[str] = mapped_column(String(80), primary_key=True)  # slug stable, ex. "antoine-d"
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)  # slug stable dérivé du nom, ex. "joueur-a"
     name: Mapped[str] = mapped_column(String(120))
     poste: Mapped[str | None] = mapped_column(String(20))  # clé de referentiel.json > roles
     active: Mapped[bool] = mapped_column(Boolean, default=True)
