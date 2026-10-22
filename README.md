@@ -30,7 +30,10 @@ Sur téléphone :
   <img src="docs/screenshots/09-telephone-accueil.png" alt="Accueil sur téléphone" width="260">
 </p>
 
-## Lancer l'application
+## Lancer l'application sur son PC (pour tester)
+
+Pour l'installer sur le serveur en ligne (PythonAnywhere), suivre plutôt [DEPLOIEMENT.md](DEPLOIEMENT.md) :
+les commandes ci-dessous sont pour un ordinateur Windows.
 
 Prérequis : Python 3.11 ou plus récent.
 
