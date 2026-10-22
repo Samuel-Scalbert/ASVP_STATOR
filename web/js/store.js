@@ -59,6 +59,13 @@
     throw { code: res.status === 403 ? "invalid_argument" : res.status >= 500 ? "unavailable" : "rejected", message: msg };
   }
 
+  let apiQueue = Promise.resolve();
+  function inApiOrder(fn) {
+    const run = apiQueue.then(fn, fn);
+    apiQueue = run.catch(() => {});
+    return run;
+  }
+
   function writeDoc(path, data) {
     if (store.mode === "local") { persistLocalSoon(); store.sync = "saved"; return; }
     if ((store.mode !== "shared" && store.mode !== "api") || store.readOnly) return;
@@ -74,7 +81,9 @@
       while (pending.has(path)) {
         const data = pending.get(path);
         pending.delete(path);
-        await attempt(path, data, 0);
+        // Avec le serveur Flask, une seule écriture à la fois et dans l’ordre des demandes :
+        // un import envoie le match avant ses fiches, et le serveur refuse une fiche dont le match n’existe pas encore.
+        await (store.mode === "api" ? inApiOrder(() => attempt(path, data, 0)) : attempt(path, data, 0));
       }
     } finally {
       inflight.delete(path);
