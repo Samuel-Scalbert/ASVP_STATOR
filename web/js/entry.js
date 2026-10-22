@@ -114,6 +114,7 @@
       const v = Math.max(0, before + delta);
       if (v === before) return false;
       if (v) g[k] = v; else delete g[k];
+      next.source = "app"; // la fiche est désormais saisie dans l’app
       commit(next);
       return true;
     }
@@ -141,7 +142,19 @@
       if (readOnly) return;
       const next = C.clone(docRef.current);
       next.bilan = Object.assign({ pp: "", pm: "", cp: "", cm: "" }, next.bilan, { [k]: v });
+      next.source = "app";
       commit(next);
+    };
+
+    // Version Excel en attente : le joueur prend la version de l’Excel ou garde sa saisie.
+    const resolve = (accept) => {
+      if (readOnly) return;
+      const next = U.resolveExcel(docRef.current, accept);
+      touched.current = true;
+      docRef.current = next;
+      setDoc(next);
+      api.saveStats(next, true);
+      U.toast(accept ? "Version de l’Excel appliquée à ta fiche." : "Ta saisie est conservée.");
     };
 
     const sets = C.setsArray(doc);
@@ -194,6 +207,8 @@
 
       <div class="page wide entry-page">
         ${readOnly && html`<p class="notice ro">Lecture seule : tu peux consulter cette fiche mais pas la modifier.</p>`}
+        <${U.ExcelConflict} excel=${doc.excel} sets=${doc.sets} bilan=${doc.bilan} who=${playerId === lsGet("asvp-stator-me", null) ? null : q.name(playerId)}
+          disabled=${readOnly} onAccept=${() => resolve(true)} onKeep=${() => resolve(false)} />
         ${onSet ? html`
           <div class="set-sum" aria-live="polite">
             <span class="set-sum-t">Set ${tab}</span>

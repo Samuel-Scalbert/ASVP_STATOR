@@ -274,6 +274,12 @@
       });
     },
     statsOf(matchId) { return Object.values(store.stats).filter((d) => d && d.matchId === matchId); },
+    /* Fiches dont la version Excel diffère de l’app et n’a pas encore été tranchée. */
+    conflictsOf(matchId) {
+      const m = store.matches[matchId];
+      if (!m || m.noData) return [];
+      return q.statsOf(matchId).filter((d) => d.excel && d.excel.status === "pending");
+    },
     doc(matchId, playerId) { return store.stats[C.statId(matchId, playerId)] || null; },
     /* Joueurs retenus pour le match (null = pas de liste : tout l’effectif actif). */
     squadOf(matchId) {

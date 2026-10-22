@@ -48,6 +48,7 @@
   }
   function MatchHero({ m, me, go }) {
     const comp = completion(m.id);
+    const conflicts = q.conflictsOf(m.id);
     const mine = me ? q.doc(m.id, me) : null;
     const state = !me ? null : !mine || !C.isFilled(mine) ? "à faire" : C.hasBilan(mine) ? "complète" : "bilan à écrire";
     const sets = C.matchSets(m);
@@ -70,6 +71,7 @@
             : m.closed ? html`<span><${ClosedBadge} band /> ${U.plural(comp.done, "fiche remplie", "fiches remplies")}</span>`
             : html`${state && html`<span>Ta fiche : <b>${state}</b></span>`}<span>${comp.done}/${comp.total} joueurs ont saisi</span>`}
         </div>
+        ${conflicts.length ? html`<div class="hero-alert" role="alert"><span class="alert-badge">ATTENTION</span>${conflicts.length > 1 ? conflicts.length + " fiches diffèrent" : "1 fiche diffère"} de l’Excel du coach : différences non résolues (${conflicts.map((d) => q.name(d.playerId)).join(", ")}).</div>` : null}
         <div class="hero-actions">
           ${!store.readOnly && !m.noData && !m.closed && html`<button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
           <button class="btn on-band-ghost" onClick=${() => go({ view: "match", matchId: m.id })}>Voir le match</button>
@@ -119,6 +121,7 @@
               <span class="mr-date">${m.date ? shortDate(m.date) : "Date ?"}</span>
               <span class="mr-main"><b>${m.opponent}</b><small>${[venueLabel(m.venue), m.competition].filter(Boolean).join(" · ") || "Match"}</small></span>
               <${ResultChip} m=${m} />
+              ${q.conflictsOf(m.id).length ? html`<span class="alert-badge sm" title="Différences avec l’Excel à trancher">ATTENTION</span>` : null}
               ${m.noData ? html`<${NoDataBadge} sm />` : m.closed ? html`<span class="mr-comp" title="Saisie close">Close</span>` : html`<span class="mr-comp" title="Joueurs ayant saisi">${comp.done}/${comp.total}</span>`}
               <${Icon} name="next" size=${18} />
             </button></li>`;
@@ -264,6 +267,113 @@
     </div>`;
   }
 
+  /* ---------- Compléter un match avec la feuille Excel du coach ---------- */
+  const MERGE_LABELS = {
+    new: ["Importée", "Pas de fiche dans l’app : la fiche de l’Excel est ajoutée."],
+    same: ["Identique", "Mêmes chiffres dans l’app et dans l’Excel."],
+    update: ["Mise à jour", "Fiche venue d’un import précédent : remplacée par cette version de l’Excel."],
+    conflict: ["ATTENTION", "Différente de la saisie de l’app : rien n’est écrasé, le joueur choisira."],
+    refused: ["Déjà tranchée", "Le joueur a déjà gardé sa saisie face à cette version de l’Excel."],
+    ignore: ["Ignorée", "Pas associée à un joueur de l’effectif."],
+  };
+  function ExcelMerge({ m, onDone }) {
+    const [state, setState] = useState({ step: "pick" });
+    const [assign, setAssign] = useState({});
+    const [useScore, setUseScore] = useState(true);
+    const roster = q.roster();
+    const autoId = (p) => { const hit = roster.find((r) => C.norm(r.name) === C.norm(p.name) || C.norm(r.name) === C.norm(p.sheet)); return hit ? hit.id : ""; };
+    const onFile = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      setState({ step: "reading", file: file.name });
+      try {
+        const res = await root.StatorIO.readWorkbookFile(file);
+        if (!res.players.length) { setState({ step: "pick", error: "Aucune feuille joueur reconnue. Le fichier doit suivre le modèle ASVP (« Services » en B3, « Attaques » en B24)." }); return; }
+        setAssign({});
+        setState({ step: "preview", file: file.name, res });
+      } catch (err) {
+        setState({ step: "pick", error: "Lecture impossible : vérifie qu’il s’agit d’un fichier .xlsx et que tu es connecté à Internet." });
+      }
+    };
+    if (state.step !== "preview") {
+      return html`<div class="import">
+        <p>Choisis la feuille de match Excel du coach. Les joueurs qui ont rempli l’Excel sont ajoutés à ce match, et ceux qui ont saisi dans l’app gardent leur fiche.</p>
+        <label class="file-drop" for="merge-file"><${Icon} name="up" /><span>${state.step === "reading" ? "Lecture de " + state.file + "…" : "Choisir le fichier .xlsx"}</span></label>
+        <input id="merge-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange=${onFile} class="sr-only" />
+        ${state.error && html`<p class="form-err" role="alert">${state.error}</p>`}
+      </div>`;
+    }
+    const res = state.res;
+    const rows = res.players.filter((p) => p.filled).map((p) => {
+      const pid = assign[p.sheet] !== undefined ? assign[p.sheet] : autoId(p);
+      if (!pid) return { p, pid: "", kind: "ignore", unknown: !autoId(p) };
+      const doc = q.doc(m.id, pid);
+      let kind;
+      if (!doc || !C.isFilled(doc)) kind = "new";
+      else if (C.sameSets(doc.sets, p.sets)) kind = "same";
+      else if (doc.source === "excel") kind = "update";
+      else if (doc.excel && doc.excel.status === "refused" && C.sameSets(doc.excel.sets, p.sets)) kind = "refused";
+      else kind = "conflict";
+      return { p, pid, doc, kind, unknown: !autoId(p) };
+    });
+    const used = rows.map((r) => r.pid).filter(Boolean);
+    const appOnly = q.statsOf(m.id).filter((d) => C.isFilled(d) && used.indexOf(d.playerId) < 0);
+    const canScore = !C.matchSets(m).length && res.scores && res.scores.length;
+    const count = (k) => rows.filter((r) => r.kind === k).length;
+    const apply = () => {
+      const now = new Date().toISOString();
+      rows.forEach((r) => {
+        if (r.kind === "ignore" || r.kind === "refused") return;
+        const id = C.statId(m.id, r.pid);
+        if (r.kind === "new" || r.kind === "update") {
+          api.saveStats({ id, matchId: m.id, playerId: r.pid, sets: C.clone(r.p.sets), bilan: C.clone(r.p.bilan), source: "excel", excel: null, updatedAt: now }, true);
+        } else if (r.kind === "same") {
+          // Mêmes chiffres : on complète seulement les bilans vides.
+          const next = C.clone(r.doc);
+          next.bilan = Object.assign({ pp: "", pm: "", cp: "", cm: "" }, next.bilan);
+          let changed = false;
+          ["pp", "pm", "cp", "cm"].forEach((k) => { if (!(next.bilan[k] || "").trim() && (r.p.bilan[k] || "").trim()) { next.bilan[k] = r.p.bilan[k]; changed = true; } });
+          if (next.excel && next.excel.status === "pending") { next.excel = null; changed = true; }
+          if (changed) { next.updatedAt = now; api.saveStats(next, true); }
+        } else if (r.kind === "conflict") {
+          const next = C.clone(r.doc);
+          next.excel = { status: "pending", sets: C.clone(r.p.sets), bilan: C.clone(r.p.bilan), file: state.file, at: now.slice(0, 10) };
+          next.updatedAt = now;
+          api.saveStats(next, true);
+        }
+      });
+      // Les joueurs de l’Excel ont joué : on les ajoute aux joueurs du match ; et le score si l’app ne l’a pas.
+      const squad = Array.isArray(m.squad) ? m.squad.slice() : [];
+      let matchChanged = false;
+      if (squad.length) used.forEach((pid) => { if (squad.indexOf(pid) < 0) { squad.push(pid); matchChanged = true; } });
+      const patch = { squad };
+      if (canScore && useScore) { patch.sets = res.scores.map((s) => ({ a: s.a, o: s.o })); patch.result = null; matchChanged = true; }
+      if (matchChanged) api.saveMatch(Object.assign({}, m, patch, { updatedAt: now }));
+      onDone({ added: count("new") + count("update"), conflicts: count("conflict") });
+    };
+    return html`<div class="import merge">
+      <p class="muted small">Fichier : ${state.file}. Les fiches remplies dans l’app ne sont jamais écrasées : en cas de différence, le joueur verra un message ATTENTION et choisira.</p>
+      <ul class="merge-list">
+        ${rows.map((r) => {
+          const [label, help] = MERGE_LABELS[r.kind];
+          return html`<li key=${r.p.sheet} class=${"merge-row " + r.kind}>
+            <div class="merge-who"><b>${r.p.name}</b><small>${U.plural(r.p.actions, "action", "actions")} dans l’Excel${C.hasBilan(r.p) ? " · bilan" : ""}</small></div>
+            ${r.unknown ? html`<select aria-label=${"Joueur correspondant à " + r.p.name} value=${r.pid} onChange=${(e) => setAssign(Object.assign({}, assign, { [r.p.sheet]: e.target.value }))}>
+              <option value="">Ignorer</option>${roster.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}</option>`)}</select>` : null}
+            <div class="merge-status"><span class=${"merge-chip " + r.kind}>${label}</span><small>${help}</small></div>
+          </li>`;
+        })}
+      </ul>
+      ${appOnly.length ? html`<p class="small">Conservées telles quelles (saisies dans l’app, absentes de l’Excel) : ${appOnly.map((d) => q.name(d.playerId)).join(", ")}.</p>` : null}
+      ${canScore ? html`<label class="nodata-toggle" for="merge-score"><input id="merge-score" type="checkbox" checked=${useScore} onChange=${(e) => setUseScore(e.target.checked)} />
+        <span><b>Remplir aussi le score des sets</b><small>Lu dans l’Excel : ${res.scores.map((s) => s.a + "–" + s.o).join(" · ")}</small></span></label>` : null}
+      <div class="row-btns end">
+        <button class="btn ghost" onClick=${() => setState({ step: "pick" })}>Choisir un autre fichier</button>
+        <button class="btn primary" onClick=${apply}>Appliquer</button>
+      </div>
+    </div>`;
+  }
+
   /* ---------- Aide d’une compétence ---------- */
   function SkillHelp({ sk }) {
     const s = C.SKILL[sk];
@@ -294,7 +404,7 @@
     return html`<section class="card">
       <div class="block-head"><h2 class="h-sec">Saisies</h2><span class="muted">${comp.done} sur ${comp.total} joueurs</span></div>
       <div class="chips">
-        ${comp.ps.map((p) => html`<span key=${p.id} class=${cx("chip", C.isFilled(p.doc) ? "done" : "todo")}>
+        ${comp.ps.map((p) => html`<span key=${p.id} class=${cx("chip", C.isFilled(p.doc) ? "done" : "todo", p.doc && p.doc.excel && p.doc.excel.status === "pending" && "alert")}>
           ${C.isFilled(p.doc) && html`<${Icon} name="check" size=${13} />`}${p.name}</span>`)}
       </div>
       ${me && !store.readOnly && (!mine || !C.isFilled(mine.doc)) && html`<div class="row-btns"><button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>Saisir mes stats</button></div>`}
@@ -374,7 +484,13 @@
     const flat = [].concat.apply([], allSets);
     const sl = C.scoreLine(flat);
     const perSet = [0, 1, 2, 3, 4].map((i) => C.scoreLine(allSets.map((s) => s[i])));
+    const conf = q.conflictsOf(m.id);
     return html`<div class="summary-grid"><div class="col">
+      ${conf.length ? html`<section class="alert-box" role="alert">
+        <div class="alert-head"><span class="alert-badge">ATTENTION</span><b>${conf.length > 1 ? conf.length + " fiches diffèrent" : "1 fiche diffère"} de l’Excel du coach</b></div>
+        <p class="small">Chaque joueur peut trancher dans sa fiche. Tu peux aussi le faire ici : touche un nom.</p>
+        <div class="chips">${conf.map((d) => html`<button key=${d.id} class="chip alert" onClick=${() => openSheet({ type: "player", p: { id: d.playerId, name: q.name(d.playerId) }, m })}>${q.name(d.playerId)}</button>`)}</div>
+      </section>` : null}
       <${Completion} comp=${comp} me=${me} m=${m} go=${go} />
       <section class="card">
         <h2 class="h-sec">L’équipe sur ce match</h2>
@@ -462,7 +578,7 @@
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr><th scope="col" class="left">Joueur</th><th scope="col">Points</th><th scope="col">Fautes</th><th scope="col" class="left">+/−</th></tr></thead>
           <tbody>${rows.map(({ p, sl }) => html`<tr key=${p.id}>
-            <th scope="row" class="left"><button class="linkish" onClick=${() => openSheet({ type: "player", p, m })}>${p.name}</button>
+            <th scope="row" class="left"><button class="linkish" onClick=${() => openSheet({ type: "player", p, m })}>${p.name}</button>${p.doc && p.doc.excel && p.doc.excel.status === "pending" ? html` <span class="alert-badge sm" title="Différences avec l’Excel à trancher">ATTENTION</span>` : null}
               <small>A ${sl.pts.attaque} · S ${sl.pts.service} · B ${sl.pts.bloc}</small></th>
             <td><b>${sl.P}</b></td><td>${sl.F}<small>A ${sl.flt.attaque} · S ${sl.flt.service} · R ${sl.flt.reception} · P ${sl.flt.passe}</small></td>
             <td class="left diff"><span class=${cx("diff-n", sl.diff > 0 && "pos", sl.diff < 0 && "neg")}>${signed(sl.diff)}</span><${DiffBar} v=${sl.diff} max=${maxD} /></td>
@@ -544,6 +660,7 @@
           ${m.video && html`<a class="btn on-band-ghost sm" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} />Vidéo YouTube</a>`}
           ${m.videoKind === "discord" && html`<span class="video-chip" title=${m.videoNote || ""}><${Icon} name="play" size=${15} />Vidéo : fichier sur Discord${m.videoNote ? " · " + m.videoNote : ""}</span>`}
           ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${toggleClosed}><${Icon} name=${m.closed ? "undo" : "check"} size=${16} />${m.closed ? "Rouvrir la saisie" : "Clôturer la saisie"}</button>`}
+          ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "excel-merge", m })}><${Icon} name="up" size=${16} />Compléter avec l’Excel</button>`}
           ${!m.noData && html`<button class="btn on-band-ghost sm" onClick=${doExport} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Excel"}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Modifier</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "delete", m })} aria-label="Supprimer le match"><${Icon} name="trash" size=${16} /></button>`}
@@ -590,7 +707,13 @@
       } catch (e) { U.toast("Impossible de préparer le fichier : vérifie ta connexion."); }
       setBusy(false);
     };
+    const resolve = (accept) => {
+      if (!doc || store.readOnly) return;
+      api.saveStats(U.resolveExcel(doc, accept), true);
+      U.toast(accept ? "Version de l’Excel appliquée à la fiche de " + p.name + "." : "Saisie de l’app conservée pour " + p.name + ".");
+    };
     return html`<div>
+      ${doc && html`<${U.ExcelConflict} excel=${doc.excel} sets=${doc.sets} bilan=${doc.bilan} who=${p.name} disabled=${store.readOnly} onAccept=${() => resolve(true)} onKeep=${() => resolve(false)} />`}
       <div class="row-btns detail-actions">
         <button class="btn ghost sm" onClick=${download} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Fiche Excel de " + p.name}</button>
         <span class="muted small">À coller dans son onglet de l’Excel du coach (voir le Tuto).</span>
@@ -612,5 +735,5 @@
     </div>`;
   }
 
-  root.StatorMatch = { Home, MatchView, MatchForm, NewMatch, SkillHelp, WhoGrid, PlayerDetail, DeleteMatch, venueLabel, ResultChip };
+  root.StatorMatch = { Home, MatchView, MatchForm, NewMatch, ExcelMerge, SkillHelp, WhoGrid, PlayerDetail, DeleteMatch, venueLabel, ResultChip };
 })(window);

@@ -86,6 +86,28 @@
     return { pts, flt, P, F, diff: P - F, actions };
   }
   function countActions(set) { return scoreLine([set]).actions; }
+
+  /* Forme canonique de comptages {"1": {"service": {"decisif": 2}}} : deux fiches égales donnent la même chaîne. */
+  function canonSets(sets) {
+    const parts = [];
+    for (let n = 1; n <= MAX_SETS; n++) {
+      const set = sets && sets[n];
+      SKILLS.forEach((s) => s.fields.forEach((f) => { const v = setVal(set, s.key, f.k); if (v) parts.push(n + "." + s.key + "." + f.k + "=" + v); }));
+    }
+    return parts.join(";");
+  }
+  const sameSets = (a, b) => canonSets(a) === canonSets(b);
+  /* Différences case par case entre la saisie de l’app et la version de l’Excel. */
+  function diffSets(app, excel) {
+    const out = [];
+    for (let n = 1; n <= MAX_SETS; n++) {
+      SKILLS.forEach((s) => s.fields.forEach((f) => {
+        const a = setVal(app && app[n], s.key, f.k), e = setVal(excel && excel[n], s.key, f.k);
+        if (a !== e) out.push({ set: n, label: s.label + " " + f.label.toLowerCase() + (f.p ? " P" + f.p : ""), app: a, excel: e });
+      }));
+    }
+    return out;
+  }
   function hasBilan(doc) {
     const b = (doc && doc.bilan) || {};
     return ["pp", "pm", "cp", "cm"].some((k) => b[k] && String(b[k]).trim());
@@ -187,10 +209,20 @@
       p.actions = scoreLine(setsArray(p)).actions;
       p.filled = p.actions > 0 || hasBilan(p);
     });
+    // Score des sets : lignes « ASVP » et « EQUIPE ADVERSE » de la feuille STATS Points (E3:I4).
+    const statsSheet = sheetNames.find((n) => norm(n) === "stats points");
+    const scores = [];
+    if (statsSheet) {
+      for (const col of SET_COLS) {
+        const a = num(statsSheet, col + "3"), o = num(statsSheet, col + "4");
+        if (!a && !o) break;
+        scores.push({ a, o });
+      }
+    }
     const base = String(fileName || "").replace(/\.[a-z0-9]+$/i, "").trim();
     const parts = base.split(/\s+[-–—]\s+|\s+vs?\.?\s+/i).map((x) => x.trim()).filter(Boolean);
     const opponent = parts.find((x) => norm(x) !== "asvp") || "";
-    return { opponent, players };
+    return { opponent, players, scores };
   }
 
   /* ---------- Export Excel au format habituel (valeurs, sans formules) ---------- */
@@ -461,6 +493,7 @@
   const api = {
     MAX_SETS, SET_COLS, setReferential,
     norm, slug, uid, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
+    canonSets, sameSets, diffSets,
     opponentLine, matchSets, matchResult, matchSetCount, seasonOf,
     parseWorkbookData, playerSheetSpec, playerExportSpec, matchWorkbookSpec, seasonWorkbookSpec,
   };

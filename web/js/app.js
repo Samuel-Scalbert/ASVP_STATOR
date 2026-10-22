@@ -138,6 +138,8 @@
       else if (sheet.type === "import") sheetEl = html`<${Sheet} title="Importer un Excel de match" onClose=${close}>
         <${S.ImportSheet} onDone=${(m) => { close(); U.toast("Match importé."); go({ view: "match", matchId: m.id }); }} /><//>`;
       else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
+      else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · ASVP – " + sheet.m.opponent} onClose=${close} wide>
+        <${M.ExcelMerge} m=${sheet.m} onDone=${(r) => { close(); U.toast(U.plural(r.added, "fiche ajoutée", "fiches ajoutées") + (r.conflicts ? " · " + U.plural(r.conflicts, "différence", "différences") + " à trancher (ATTENTION)" : "") + "."); }} /><//>`;
       else if (sheet.type === "delete") sheetEl = html`<${Sheet} title="Supprimer le match" onClose=${close}>
         <${M.DeleteMatch} m=${sheet.m} onCancel=${close} onDone=${() => { close(); U.toast("Match supprimé."); go({ view: "home" }); }} /><//>`;
     }

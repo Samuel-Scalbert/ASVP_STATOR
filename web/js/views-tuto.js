@@ -280,6 +280,7 @@
             <h2 class="h-sec"><span class="sec-n">8</span>Questions fréquentes</h2>
             <dl class="faq">
               <dt>On n’a pas la vidéo d’un match.</dt><dd>À la création (ou avec « Modifier »), coche « Pas de vidéo : score seulement » et renseigne le score. Le match est marqué NO VIDEO / NO DATA : il compte dans les victoires et les sets de la saison, sans fiches à remplir. Si la vidéo arrive plus tard, décoche l’option.</dd>
+              <dt>Certains joueurs remplissent encore l’Excel du coach.</dt><dd>Sur la page du match, « Compléter avec l’Excel » lit la feuille de match : les fiches présentes seulement dans l’Excel sont ajoutées, celles saisies dans l’app sont conservées. Si un joueur a une fiche dans les deux et que les chiffres diffèrent, rien n’est écrasé : il voit un message ATTENTION dans sa fiche et choisit « Prendre la version de l’Excel » ou « Garder ma saisie ». Tant que ce n’est pas tranché, l’accueil et la page du match l’indiquent en rouge.</dd>
               <dt>Il manque des points par rapport au score final.</dt><dd>Ce n’est pas grave : ce sont des moments sans vidéo, ou des fautes de l’adversaire que la fiche ne note pas. Une fois la saisie close, l’app les affiche comme « points non notés » et ne les comptabilise pas.</dd>
               <dt>Un joueur n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
               <dt>J’ai touché la mauvaise case.</dt><dd>Le − dans le coin de la case retire 1 ; « Annuler » en bas efface la dernière touche.</dd>

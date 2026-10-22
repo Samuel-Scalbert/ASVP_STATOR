@@ -2,6 +2,7 @@
 que la version artefact : config, matches, stats)."""
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from datetime import date, datetime
@@ -12,6 +13,7 @@ from .referentiel import field_ids
 ID_RE = re.compile(r"^[A-Za-z0-9_\-.~:@+]{1,170}$")
 VENUES = {"", "dom", "ext"}
 VIDEO_KINDS = {"", "lien", "discord"}
+SOURCES = {"app", "excel"}
 
 
 class InvalidData(ValueError):
@@ -90,6 +92,8 @@ def sheet_doc(s: StatSheet, field_by_id: dict[str, tuple[str, str]]) -> dict:
         "id": s.id, "matchId": s.match_id, "playerId": s.player_id, "sets": sets,
         "bilan": {"pp": s.bilan_perso_plus, "pm": s.bilan_perso_moins,
                   "cp": s.bilan_collectif_plus, "cm": s.bilan_collectif_moins},
+        "source": s.source or "app",
+        "excel": json.loads(s.excel_json) if s.excel_json else None,
         "updatedAt": _iso(s.updated_at),
     }
 
@@ -207,19 +211,14 @@ def delete_match(match_id: str) -> bool:
     return True
 
 
-def save_sheet(sheet_id: str, doc: dict) -> StatSheet:
-    match_id = _check_id(doc.get("matchId"), "match")
-    player_id = _check_id(doc.get("playerId"), "joueur")
-    if sheet_id != f"{match_id}__{player_id}":
-        raise InvalidData("L'identifiant de la fiche ne correspond pas au match et au joueur.")
-    if db.session.get(Match, match_id) is None:
-        raise InvalidData("Ce match n'existe pas (il a peut-être été supprimé).")
-    ensure_player(player_id)
-    fields = field_ids()
-    counts: list[StatCount] = []
-    sets = doc.get("sets") or {}
+def _parse_sets(sets) -> list[tuple[int, str, int]]:
+    """Valide des comptages {"1": {"service": {"decisif": 2}}} et renvoie [(set, id de stat, nombre)]."""
+    if sets is None:
+        return []
     if not isinstance(sets, dict):
         raise InvalidData("Format des sets invalide.")
+    fields = field_ids()
+    out = []
     for set_key, per_skill in sets.items():
         set_no = _int(int(set_key) if str(set_key).isdigit() else -1, "Numéro de set", 1, 5)
         for skill, per_field in (per_skill or {}).items():
@@ -229,7 +228,37 @@ def save_sheet(sheet_id: str, doc: dict) -> StatSheet:
                     raise InvalidData(f"Stat inconnue du référentiel : {skill}.{key}.")
                 n = _int(n, f"{skill}.{key}", 0, 999)
                 if n:
-                    counts.append(StatCount(set_no=set_no, field_id=fid, count=n))
+                    out.append((set_no, fid, n))
+    return out
+
+
+def _excel_version(excel) -> str:
+    """Version Excel en attente (ou refusée) d'une fiche, validée puis stockée en JSON."""
+    if not excel:
+        return ""
+    if not isinstance(excel, dict) or excel.get("status") not in ("pending", "refused"):
+        raise InvalidData("Version Excel invalide.")
+    _parse_sets(excel.get("sets"))
+    bilan = excel.get("bilan") or {}
+    clean = {
+        "status": excel["status"],
+        "sets": excel.get("sets") or {},
+        "bilan": {k: str(bilan.get(k) or "") for k in ("pp", "pm", "cp", "cm")},
+        "file": str(excel.get("file") or "")[:200],
+        "at": str(excel.get("at") or "")[:40],
+    }
+    return json.dumps(clean, ensure_ascii=False)
+
+
+def save_sheet(sheet_id: str, doc: dict) -> StatSheet:
+    match_id = _check_id(doc.get("matchId"), "match")
+    player_id = _check_id(doc.get("playerId"), "joueur")
+    if sheet_id != f"{match_id}__{player_id}":
+        raise InvalidData("L'identifiant de la fiche ne correspond pas au match et au joueur.")
+    if db.session.get(Match, match_id) is None:
+        raise InvalidData("Ce match n'existe pas (il a peut-être été supprimé).")
+    ensure_player(player_id)
+    counts = [StatCount(set_no=n, field_id=fid, count=c) for n, fid, c in _parse_sets(doc.get("sets"))]
     bilan = doc.get("bilan") or {}
     sheet = db.session.get(StatSheet, sheet_id)
     if sheet is None:
@@ -242,6 +271,11 @@ def save_sheet(sheet_id: str, doc: dict) -> StatSheet:
     sheet.bilan_perso_moins = str(bilan.get("pm") or "")
     sheet.bilan_collectif_plus = str(bilan.get("cp") or "")
     sheet.bilan_collectif_moins = str(bilan.get("cm") or "")
+    source = doc.get("source") or "app"
+    if source not in SOURCES:
+        raise InvalidData("Origine de la fiche invalide.")
+    sheet.source = source
+    sheet.excel_json = _excel_version(doc.get("excel"))
     sheet.updated_at = utcnow()
     sheet.counts.extend(counts)
     db.session.commit()

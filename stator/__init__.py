@@ -69,6 +69,11 @@ def _upgrade_schema() -> None:
             conn.execute(text("ALTER TABLE matches ADD COLUMN video_note VARCHAR(200) DEFAULT ''"))
         if "closed" not in columns:
             conn.execute(text("ALTER TABLE matches ADD COLUMN closed BOOLEAN DEFAULT 0"))
+        sheet_columns = {c["name"] for c in inspect(conn).get_columns("stat_sheets")}
+        if "source" not in sheet_columns:
+            conn.execute(text("ALTER TABLE stat_sheets ADD COLUMN source VARCHAR(10) DEFAULT 'app'"))
+        if "excel_json" not in sheet_columns:
+            conn.execute(text("ALTER TABLE stat_sheets ADD COLUMN excel_json TEXT DEFAULT ''"))
         for view in ("v_player_match", "v_player_skill", "v_stats_detail"):  # vues d'analyse retirées
             conn.execute(text(f"DROP VIEW IF EXISTS {view}"))
 

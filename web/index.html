@@ -604,6 +604,26 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .newmatch-grid .tpl-list { grid-template-columns: 1fr; }
 }
 
+/* ---------- Différences avec l’Excel du coach (ATTENTION) ---------- */
+.alert-box { display: flex; flex-direction: column; gap: 8px; border: 2px solid var(--bad); background: var(--bad-bg); border-radius: var(--r); padding: 12px 14px; }
+.alert-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--bad-ink); }
+.alert-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; border-radius: 6px; padding: 2px 8px; background: var(--bad); color: #ffffff; white-space: nowrap; }
+.alert-badge.sm { font-size: 10px; padding: 1px 6px; }
+.alert-details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.alert-details ul { margin: 6px 0 0; padding-left: 20px; font-size: 13.5px; display: flex; flex-direction: column; gap: 2px; }
+.chip.alert { border-color: var(--bad); color: var(--bad-ink); background: var(--surface); font-weight: 700; cursor: pointer; }
+.hero-alert { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; font-weight: 600; color: var(--band-ink); border: 1px solid var(--bad); border-radius: 10px; padding: 8px 10px; }
+.merge-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.merge-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.merge-row.conflict { border-color: var(--bad); background: var(--bad-bg); }
+.merge-row select { grid-column: 1 / -1; }
+.merge-who { display: flex; flex-direction: column; min-width: 0; }
+.merge-who small, .merge-status small { color: var(--muted); font-size: 12.5px; }
+.merge-status { display: flex; flex-direction: column; align-items: flex-end; text-align: right; max-width: 280px; }
+.merge-chip { font-size: 12px; font-weight: 800; border-radius: 6px; padding: 2px 8px; background: var(--surface-2); color: var(--ink-2); }
+.merge-chip.new, .merge-chip.update { background: var(--o1-bg); color: var(--o1); }
+.merge-chip.conflict { background: var(--bad); color: #ffffff; letter-spacing: 0.06em; }
+
 /* ---------- Type de match, saisie close, vidéo sur Discord ---------- */
 .type-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .closed-badge { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--good-bg); color: var(--good-ink); }

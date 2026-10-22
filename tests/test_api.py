@@ -97,3 +97,19 @@ def test_video_on_discord_and_closed_match(team):
     assert (m["videoKind"], m["videoNote"], m["video"], m["closed"]) == ("discord", "match-retour.mp4", "", True)
     assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "videoKind": "cassette"}).status_code == 400
     assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "videoKind": "lien", "video": ""}).status_code == 400
+
+
+def test_excel_version_pending_on_a_sheet(team):
+    excel = {"status": "pending", "sets": {"1": {"attaque": {"decisive_p3": 4}}}, "bilan": {"pp": "Vu dans l'Excel"},
+             "file": "ASVP - Club Exemple.xlsx", "at": "2026-10-22"}
+    r = team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, source="app", excel=excel))
+    assert r.status_code == 200
+    doc = team.get("/api/state").get_json()["stats"]["m-exemple__joueur-a"]
+    assert doc["source"] == "app" and doc["excel"]["status"] == "pending"
+    assert doc["excel"]["sets"] == excel["sets"] and doc["excel"]["bilan"]["pp"] == "Vu dans l'Excel"
+    assert doc["sets"] == FICHE["sets"]  # la saisie de l'app n'est pas touchée
+    bad = dict(excel, sets={"1": {"attaque": {"inconnue": 1}}})
+    assert team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, excel=bad)).status_code == 400
+    assert team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, source="papier")).status_code == 400
+    team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, excel=None))
+    assert team.get("/api/state").get_json()["stats"]["m-exemple__joueur-a"]["excel"] is None

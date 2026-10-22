@@ -248,6 +248,45 @@
     </svg>`;
   }
 
+  /* Version Excel différente de la saisie de l’app : le joueur (ou le coach) tranche. */
+  function ExcelConflict({ excel, sets, bilan, who, onAccept, onKeep, disabled }) {
+    if (!excel || excel.status !== "pending") return null;
+    const diffs = C.diffSets(sets, excel.sets);
+    const BILANS = [["pp", "Bilan perso (+)"], ["pm", "Bilan perso (−)"], ["cp", "Bilan collectif (+)"], ["cm", "Bilan collectif (−)"]];
+    const b = bilan || {}, eb = excel.bilan || {};
+    const bilanDiffs = BILANS.filter(([k]) => (eb[k] || "").trim() && (eb[k] || "").trim() !== (b[k] || "").trim());
+    const when = excel.at ? " le " + excel.at.slice(0, 10).split("-").reverse().join("/") : "";
+    return html`<div class="alert-box" role="alert">
+      <div class="alert-head"><span class="alert-badge">ATTENTION</span>
+        <b>Les chiffres annoncés dans l’Excel du coach diffèrent de ${who ? "la saisie de " + who : "ta saisie"}.</b></div>
+      <p class="small">Excel « ${excel.file || "feuille de match"} », importé${when}. Rien n’a été modifié : ${who ? "le joueur ou toi choisissez" : "à toi de choisir"} la version à garder.</p>
+      ${diffs.length || bilanDiffs.length ? html`<details class="alert-details"><summary>Voir les différences (${diffs.length + bilanDiffs.length})</summary>
+        <ul>${diffs.map((d, i) => html`<li key=${i}>Set ${d.set} · ${d.label} : app <b>${d.app}</b> · Excel <b>${d.excel}</b></li>`)}
+          ${bilanDiffs.map(([k, l]) => html`<li key=${k}>${l} : texte différent dans l’Excel (« ${eb[k]} »)</li>`)}</ul>
+      </details>` : null}
+      <div class="row-btns">
+        <button type="button" class="btn danger sm" disabled=${disabled} onClick=${onAccept}>Prendre la version de l’Excel</button>
+        <button type="button" class="btn ghost sm" disabled=${disabled} onClick=${onKeep}>${who ? "Garder la saisie de l’app" : "Garder ma saisie"}</button>
+      </div>
+    </div>`;
+  }
+  /* Résolution d’un conflit : nouvelle fiche à enregistrer. */
+  function resolveExcel(doc, accept) {
+    const next = C.clone(doc);
+    if (accept) {
+      next.sets = C.clone(doc.excel.sets) || {};
+      const eb = doc.excel.bilan || {};
+      next.bilan = Object.assign({ pp: "", pm: "", cp: "", cm: "" }, next.bilan);
+      ["pp", "pm", "cp", "cm"].forEach((k) => { if ((eb[k] || "").trim()) next.bilan[k] = eb[k]; });
+      next.source = "excel";
+      next.excel = null;
+    } else {
+      next.excel = Object.assign({}, doc.excel, { status: "refused" }); // un même Excel réimporté ne reposera pas la question
+    }
+    next.updatedAt = new Date().toISOString();
+    return next;
+  }
+
   /* Petite barre divergente pour la différence points − fautes. */
   function DiffBar({ v, max }) {
     const m = Math.max(1, max);
@@ -257,5 +296,5 @@
     </span>`;
   }
 
-  root.StatorUI = { pct, signed, plural, agree, fmtDate, shortDate, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
+  root.StatorUI = { ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
 })(window);

@@ -103,6 +103,10 @@ class StatSheet(db.Model):
     bilan_perso_moins: Mapped[str] = mapped_column(Text, default="")
     bilan_collectif_plus: Mapped[str] = mapped_column(Text, default="")
     bilan_collectif_moins: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(10), default="app")  # "app" (saisie dans l'app) ou "excel" (importée)
+    # Version lue dans l'Excel du coach quand elle diffère de la saisie de l'app (JSON) :
+    # {"status": "pending" | "refused", "sets": {...}, "bilan": {...}, "file": "...", "at": "..."}
+    excel_json: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     match: Mapped[Match] = relationship(back_populates="sheets")
