@@ -237,6 +237,11 @@
           <button class="btn ghost" onClick=${() => go({ view: "season" })}><${Icon} name="down" size=${18} />Exporter la saison (onglet Saison)</button>
         </div>
       </section>
+      ${store.app && store.app.version && html`<section class="card">
+        <h2 class="h-sec">Version de l’app</h2>
+        <p><b>${store.app.version}</b>${store.app.commit ? html` · commit <code>${store.app.commit}</code>` : null}${store.app.date ? " du " + store.app.date.split("-").reverse().join("/") : ""}</p>
+        <p class="muted small">C’est la version qui tourne sur ce serveur. Si le code de commit diffère du dernier commit sur GitHub, le serveur n’est pas à jour : lance la mise à jour (voir DEPLOIEMENT.md).</p>
+      </section>`}
       </div>
       </div>
     </div>`;

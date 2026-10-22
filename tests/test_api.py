@@ -64,3 +64,9 @@ def test_match_video_link(team):
     assert r.status_code == 200
     assert team.get("/api/state").get_json()["matches"]["m-exemple"]["video"] == "https://youtu.be/abc123XYZ_0"
     assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "video": "javascript:alert(1)"}).status_code == 400
+
+
+def test_version_is_exposed(client):
+    health = client.get("/api/health").get_json()
+    assert health["ok"] is True and health["version"]
+    assert client.get("/api/state").get_json()["app"]["version"] == health["version"]

@@ -19,6 +19,7 @@
     sync: "idle",           // idle | saving | saved | error
     notice: null,           // { kind, text }
     config: null, matches: {}, stats: {},
+    app: null,              // version du serveur (mode api) : { version, commit, date }
     v: 0, subs: new Set(), db: null,
   };
   function emit() { store.v++; store.subs.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); }
@@ -151,6 +152,7 @@
   }
   async function initApi(first) {
     store.mode = "api";
+    store.app = first.app || null;
     applyConfig(first.config);
     COLS.forEach((c) => applyCollection(c, first[c] || {}));
     store.ready = true;
@@ -161,6 +163,7 @@
       busy = true;
       try {
         const s = await fetchState();
+        store.app = s.app || store.app;
         applyConfig(s.config);
         COLS.forEach((c) => applyCollection(c, s[c] || {}));
         if (store.notice && store.notice.kind === "net") store.notice = null;

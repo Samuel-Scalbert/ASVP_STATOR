@@ -1,0 +1,2 @@
+# Les scripts shell tournent sur le serveur Linux de PythonAnywhere : fins de ligne Unix obligatoires.
+*.sh text eol=lf

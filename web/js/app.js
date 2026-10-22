@@ -154,6 +154,8 @@
           <button class="me-chip" onClick=${() => setSheet({ type: "who" })} aria-label="Changer de joueur">
             <span class="me-k">${meValid ? "Connecté en tant que" : "Pour saisir"}</span><span class="me-v">${meValid ? q.name(meValid) : "Qui es-tu ?"}</span></button>
           <${SyncBadge} />
+          ${store.app && store.app.version && html`<span class="app-version" title="Version de l’app sur ce serveur (comparer avec le dernier commit sur GitHub)">
+            Version ${store.app.version}${store.app.commit ? " · " + store.app.commit : ""}</span>`}
         </div>
       </aside>
       ${view !== "entry" && html`<header class="topbar">

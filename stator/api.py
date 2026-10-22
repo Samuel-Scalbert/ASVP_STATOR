@@ -1,7 +1,7 @@
 """API REST consommée par l'interface (web/js/store.js)."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from . import referentiel, services
 from .models import db
@@ -24,12 +24,14 @@ def _invalid(exc: services.InvalidData):
 
 @bp.get("/health")
 def health():
-    return jsonify(ok=True)
+    return jsonify(ok=True, **current_app.config["STATOR_VERSION"])
 
 
 @bp.get("/state")
 def get_state():
-    return jsonify(services.state())
+    data = services.state()
+    data["app"] = current_app.config["STATOR_VERSION"]  # version qui tourne sur ce serveur
+    return jsonify(data)
 
 
 @bp.put("/config")

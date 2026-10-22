@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 
 from flask import Flask, Response, abort, send_from_directory
@@ -10,7 +11,25 @@ from sqlalchemy.engine import Engine
 
 from .models import db
 
-WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+WEB_DIR = ROOT_DIR / "web"
+
+
+def version_info() -> dict:
+    """Version affichée dans l'app : numéro du fichier VERSION + dernier commit git (s'il est disponible)."""
+    info = {"version": "", "commit": "", "date": ""}
+    try:
+        info["version"] = (ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%h %cs"], cwd=ROOT_DIR, capture_output=True,
+                             text=True, timeout=5, check=True).stdout.split()
+        if len(out) == 2:
+            info["commit"], info["date"] = out
+    except (OSError, subprocess.SubprocessError):
+        pass  # pas de git sur cette machine : on affiche seulement le numéro de version
+    return info
 
 # L'interface (web/index.html) est écrite sans <html>/<head> pour pouvoir aussi être
 # publiée en artefact Claude ; Flask l'enveloppe dans ce squelette.
@@ -53,6 +72,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
     app.json.ensure_ascii = False
+    app.config["STATOR_VERSION"] = version_info()
     db.init_app(app)
 
     from . import api, referentiel

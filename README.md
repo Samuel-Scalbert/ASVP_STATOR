@@ -52,6 +52,11 @@ web/      la page : index.html, scripts js/, logo img/, et referentiel.json (ges
 tests/    tests automatiques
 ```
 
+## Mise en ligne et mises à jour
+
+Voir [DEPLOIEMENT.md](DEPLOIEMENT.md) : installation sur PythonAnywhere, mise à jour en une
+commande (`bash deploy/mise-a-jour.sh`), vérification de la version en ligne, sauvegardes.
+
 ## Avant de mettre en ligne
 
 L'application n'a pas encore de mot de passe : elle est faite pour être utilisée en local ou sur
