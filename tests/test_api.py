@@ -113,3 +113,7 @@ def test_excel_version_pending_on_a_sheet(team):
     assert team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, source="papier")).status_code == 400
     team.put("/api/stats/m-exemple__joueur-a", json=dict(FICHE, excel=None))
     assert team.get("/api/state").get_json()["stats"]["m-exemple__joueur-a"]["excel"] is None
+
+
+def test_api_level_is_exposed_for_stale_page_detection(client):
+    assert client.get("/api/state").get_json()["app"]["api"] >= 4

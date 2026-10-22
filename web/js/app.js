@@ -173,7 +173,7 @@
         </div>
       </header>`}
       <main class="main">
-        ${store.notice && view !== "entry" && html`<div class="page notice-wrap"><p class=${cx("notice", store.notice.kind)}>${store.notice.text}</p></div>`}
+        ${store.notice && (view !== "entry" || store.notice.kind === "stale") && html`<div class="page notice-wrap"><p class=${cx("notice", store.notice.kind)}>${store.notice.text}</p></div>`}
         <${Boundary} key=${view + (route.matchId || "")} onReset=${() => go({ view: "home" })}>${body}<//>
       </main>
       ${view !== "entry" && html`<nav class="tabbar" aria-label="Sections">

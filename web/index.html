@@ -139,7 +139,8 @@ main { min-height: 60vh; }
 .linkish { background: none; border: 0; padding: 0; font-weight: 700; color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; text-align: left; }
 .notice { border-radius: var(--r-sm); padding: 10px 14px; font-size: 14px; background: var(--surface); border: 1px solid var(--line-2); }
 .notice.ro { border-color: var(--o2); background: var(--o2-bg); }
-.notice.err, .notice.net { border-color: var(--bad); background: var(--bad-bg); }
+.notice.err, .notice.net, .notice.stale { border-color: var(--bad); background: var(--bad-bg); }
+.notice.stale { border-width: 2px; font-weight: 600; color: var(--bad-ink); }
 .empty-state { text-align: center; align-items: center; padding-block: 28px; }
 .empty-state > * { max-width: 100%; }
 .loading-card .ball { opacity: 0.9; }

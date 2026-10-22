@@ -14,11 +14,14 @@ from .models import db
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT_DIR / "web"
+# Niveau de l'API : à augmenter (ici et dans web/js/store.js) quand la page envoie ou attend de nouvelles
+# données. Une page plus récente que le serveur se met alors en lecture seule au lieu de perdre des données.
+API_LEVEL = 4
 
 
 def version_info() -> dict:
     """Version affichée dans l'app : numéro du fichier VERSION + dernier commit git (s'il est disponible)."""
-    info = {"version": "", "commit": "", "date": ""}
+    info = {"version": "", "commit": "", "date": "", "api": API_LEVEL}
     try:
         info["version"] = (ROOT_DIR / "VERSION").read_text(encoding="utf-8").strip()
     except OSError:

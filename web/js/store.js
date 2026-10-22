@@ -6,6 +6,8 @@
   "use strict";
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
+  // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
+  const API_LEVEL = 4;
   const COLS = ["matches", "stats"];
 
   function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -145,6 +147,17 @@
     emit();
   }
 
+  /* Page plus récente que le serveur (serveur pas redémarré après une mise à jour) : il ignorerait une partie
+     de ce que la page envoie. On bloque la saisie et on le dit, plutôt que de perdre des données en silence. */
+  function checkServerLevel() {
+    const level = (store.app && store.app.api) || 0;
+    if (level >= API_LEVEL) return;
+    store.readOnly = true;
+    store.notice = { kind: "stale", text: "Le serveur tourne encore avec une ancienne version de l’app"
+      + (store.app && store.app.version ? " (" + store.app.version + ")" : "")
+      + ". Redémarre-le avant de saisir : sur PythonAnywhere, bouton « Reload » de l’onglet Web ; sur ton PC, Ctrl+C puis relance « flask run ». La saisie est bloquée en attendant, pour ne rien perdre." };
+  }
+
   async function fetchState() {
     const res = await fetch("api/state", { cache: "no-store", headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error("state " + res.status);
@@ -153,6 +166,7 @@
   async function initApi(first) {
     store.mode = "api";
     store.app = first.app || null;
+    checkServerLevel();
     applyConfig(first.config);
     COLS.forEach((c) => applyCollection(c, first[c] || {}));
     store.ready = true;
@@ -164,6 +178,10 @@
       try {
         const s = await fetchState();
         store.app = s.app || store.app;
+        if (store.notice && store.notice.kind === "stale" && ((store.app && store.app.api) || 0) >= API_LEVEL) {
+          store.notice = null; // le serveur a été redémarré avec la bonne version
+          store.readOnly = false;
+        } else checkServerLevel();
         applyConfig(s.config);
         COLS.forEach((c) => applyCollection(c, s[c] || {}));
         if (store.notice && store.notice.kind === "net") store.notice = null;
