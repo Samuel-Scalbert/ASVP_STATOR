@@ -65,11 +65,12 @@
       <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}</div>
       <div class="hero-foot">
         <div class="hero-state">
-          ${state && html`<span>Ta fiche : <b>${state}</b></span>`}
-          <span>${comp.done}/${comp.total} joueurs ont saisi</span>
+          ${m.noData
+            ? html`<span><${NoDataBadge} /> Pas de vidéo : seul le score est enregistré.</span>`
+            : html`${state && html`<span>Ta fiche : <b>${state}</b></span>`}<span>${comp.done}/${comp.total} joueurs ont saisi</span>`}
         </div>
         <div class="hero-actions">
-          ${!store.readOnly && html`<button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
+          ${!store.readOnly && !m.noData && html`<button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
           <button class="btn on-band-ghost" onClick=${() => go({ view: "match", matchId: m.id })}>Voir le match</button>
         </div>
       </div>
@@ -117,7 +118,7 @@
               <span class="mr-date">${m.date ? shortDate(m.date) : "Date ?"}</span>
               <span class="mr-main"><b>${m.opponent}</b><small>${[venueLabel(m.venue), m.competition].filter(Boolean).join(" · ") || "Match"}</small></span>
               <${ResultChip} m=${m} />
-              <span class="mr-comp" title="Joueurs ayant saisi">${comp.done}/${comp.total}</span>
+              ${m.noData ? html`<${NoDataBadge} sm />` : html`<span class="mr-comp" title="Joueurs ayant saisi">${comp.done}/${comp.total}</span>`}
               <${Icon} name="next" size=${18} />
             </button></li>`;
           })}
@@ -139,6 +140,7 @@
     const [venue, setVenue] = useState(m ? m.venue || "" : p.venue != null ? p.venue : "dom");
     const [comp, setComp] = useState(m ? m.competition || "" : p.competition || "");
     const [video, setVideo] = useState(m ? m.video || "" : "");
+    const [noData, setNoData] = useState(m ? !!m.noData : !!p.noData);
     const [squad, setSquad] = useState(() => (m && Array.isArray(m.squad) && m.squad.length ? m.squad.slice() : activeIds));
     const init = C.matchSets(m || {});
     const [rows, setRows] = useState(() => [0, 1, 2, 3, 4].map((i) => (init[i] ? { a: String(init[i].a), o: String(init[i].o) } : { a: "", o: "" })));
@@ -157,13 +159,14 @@
     const submit = (e) => {
       e.preventDefault();
       if (!opp.trim()) { setErr("Indique le nom de l’adversaire."); return; }
-      if (choices.length && !squad.length) { setErr("Coche au moins un joueur du match."); return; }
-      if (video.trim() && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
       const res = fromSets ? null : (Number.isFinite(parseInt(ra, 10)) && Number.isFinite(parseInt(ro, 10)) ? { a: parseInt(ra, 10), o: parseInt(ro, 10) } : null);
+      if (noData && !sets.length && !res) { setErr("Renseigne le score : le détail des sets, ou au moins le résultat en sets."); return; }
+      if (!noData && choices.length && !squad.length) { setErr("Coche au moins un joueur du match."); return; }
+      if (!noData && video.trim() && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
       const order = roster.map((x) => x.id);
       const doc = Object.assign({}, m || { id: C.uid("m-"), createdAt: new Date().toISOString() }, {
-        opponent: opp.trim(), date, venue, competition: comp.trim(), video: video.trim(), sets, result: res,
-        squad: squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
+        opponent: opp.trim(), date, venue, competition: comp.trim(), video: noData ? "" : video.trim(), sets, result: res, noData,
+        squad: noData ? [] : squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
       });
       api.saveMatch(doc);
       onDone(doc, !editing);
@@ -196,7 +199,12 @@
       <div class="field"><label for="f-comp"><b>Compétition</b><small>Facultatif</small></label>
         <input id="f-comp" list="f-comp-list" value=${comp} onInput=${(e) => setComp(e.target.value)} placeholder="Ex. : Championnat, Coupe" autocomplete="off" />
         <datalist id="f-comp-list">${competitions.map((o) => html`<option key=${o} value=${o}></option>`)}</datalist></div>
-      ${choices.length ? html`<fieldset class="field">
+      <label class=${cx("nodata-toggle", noData && "on")} for="f-nodata">
+        <input id="f-nodata" type="checkbox" checked=${noData} onChange=${(e) => { setNoData(e.target.checked); setErr(""); }} />
+        <span><b>Pas de vidéo : score seulement</b>
+          <small>Le match sera marqué <span class="nodata-badge sm">NO VIDEO / NO DATA</span> : on enregistre le score, sans fiches à remplir. Si la vidéo arrive plus tard, il suffira de décocher.</small></span>
+      </label>
+      ${noData ? null : choices.length ? html`<fieldset class="field">
         <legend><b>Joueurs du match</b><small>${squad.length} sur ${choices.length} · ce sont eux qui remplissent une fiche</small></legend>
         <div class="row-btns">
           <button type="button" class="btn ghost sm" onClick=${() => setSquad(activeIds)}>Tout l’effectif</button>
@@ -209,11 +217,11 @@
             <span class="squad-name">${x.name}${q.posteLabel(x.id) ? html`<small>${q.posteLabel(x.id)}</small>` : null}</span></button>`; })}
         </div>
       </fieldset>` : html`<p class="muted small">L’effectif est vide : ajoute les joueurs dans l’onglet Équipe pour choisir qui joue ce match.</p>`}
-      <div class="field"><label for="f-video"><b>Vidéo YouTube du match</b><small>Facultatif : colle le lien de la vidéo</small></label>
+      ${!noData && html`<div class="field"><label for="f-video"><b>Vidéo YouTube du match</b><small>Facultatif : colle le lien de la vidéo</small></label>
         <input id="f-video" type="url" inputmode="url" value=${video} onInput=${(e) => { setVideo(e.target.value); setErr(""); }} placeholder="https://youtu.be/…" autocomplete="off" />
-        ${video.trim() && /^https?:\/\//i.test(video.trim()) && !U.youtubeEmbed(video) ? html`<small class="warn">Ce lien n’est pas reconnu comme une vidéo YouTube : il s’ouvrira simplement dans un nouvel onglet.</small>` : null}</div>
-      ${editing || sets.length || ra || ro
-        ? html`<fieldset class="field"><legend><b>Score des sets</b><small>Facultatif, mais il permet de vérifier les stats saisies.</small></legend>${scoreFields}</fieldset>`
+        ${video.trim() && /^https?:\/\//i.test(video.trim()) && !U.youtubeEmbed(video) ? html`<small class="warn">Ce lien n’est pas reconnu comme une vidéo YouTube : il s’ouvrira simplement dans un nouvel onglet.</small>` : null}</div>`}
+      ${editing || noData || sets.length || ra || ro
+        ? html`<fieldset class="field"><legend><b>Score des sets</b><small>${noData ? "Obligatoire : le détail des sets, ou au moins le résultat en sets." : "Facultatif, mais il permet de vérifier les stats saisies."}</small></legend>${scoreFields}</fieldset>`
         : html`<details class="score-later"><summary>Le match est déjà joué ? Renseigner le score</summary>
             <p class="muted small">Sinon, tu pourras l’ajouter après le match avec le bouton « Modifier ».</p>${scoreFields}</details>`}
       ${err && html`<p class="form-err" role="alert">${err}</p>`}
@@ -233,6 +241,7 @@
       { k: "champ-ext", label: "Championnat à l’extérieur", sub: "Compétition et lieu déjà remplis", preset: { competition: "Championnat", venue: "ext" } },
       { k: "coupe", label: "Coupe", sub: "Compétition déjà remplie", preset: { competition: "Coupe", venue: "" } },
       { k: "amical", label: "Match amical", sub: "Compétition déjà remplie", preset: { competition: "Amical", venue: "" } },
+      { k: "no-data", label: "Score seulement (pas de vidéo)", sub: "Marqué NO VIDEO / NO DATA, sans fiches à remplir", preset: { noData: true } },
     ];
     // Matchs retour : un adversaire rencontré une seule fois, avec le lieu inversé.
     const seen = {};
@@ -525,23 +534,41 @@
             <span class="eyebrow on-band">${fmtDate(m.date)}${venueLabel(m.venue) ? " · " + venueLabel(m.venue) : ""}${m.competition ? " · " + m.competition : ""}</span>
             <div class="board sm"><span class="board-team">ASVP</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}</span></div>
             <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}</div>
+            ${m.noData && html`<div class="board-sets"><${NoDataBadge} /></div>`}
           </div>
         </div>
         <div class="match-actions">
-          ${!store.readOnly && html`<button class="btn primary sm" onClick=${() => go({ view: "entry", matchId })}>Saisir les stats</button>`}
+          ${!store.readOnly && !m.noData && html`<button class="btn primary sm" onClick=${() => go({ view: "entry", matchId })}>Saisir les stats</button>`}
           ${m.video && html`<a class="btn on-band-ghost sm" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} />Vidéo YouTube</a>`}
-          <button class="btn on-band-ghost sm" onClick=${doExport} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Excel"}</button>
+          ${!m.noData && html`<button class="btn on-band-ghost sm" onClick=${doExport} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Excel"}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Modifier</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "delete", m })} aria-label="Supprimer le match"><${Icon} name="trash" size=${16} /></button>`}
         </div>
-        <div class="subtabs" role="tablist">
+        ${!m.noData && html`<div class="subtabs" role="tablist">
           ${tabs.map(([k, l]) => html`<button key=${k} role="tab" aria-selected=${sub === k} class=${sub === k ? "on" : ""} onClick=${() => setSub(k)}>${l}</button>`)}
-        </div>
+        </div>`}
       </section>
       <div class="page wide">
-        ${sub === "joueurs" ? html`<${Players} m=${m} openSheet=${openSheet} />` : sub === "bilans" ? html`<${Bilans} m=${m} />` : html`<${Summary} m=${m} me=${me} go=${go} openSheet=${openSheet} />`}
+        ${m.noData ? html`<${NoDataPanel} m=${m} openSheet=${openSheet} />`
+          : sub === "joueurs" ? html`<${Players} m=${m} openSheet=${openSheet} />` : sub === "bilans" ? html`<${Bilans} m=${m} />` : html`<${Summary} m=${m} me=${me} go=${go} openSheet=${openSheet} />`}
       </div>
     </div>`;
+  }
+  /* Match enregistré sans vidéo : le score seulement. */
+  function NoDataPanel({ m, openSheet }) {
+    const sets = C.matchSets(m);
+    const r = C.matchResult(m);
+    const hasStats = q.statsOf(m.id).some((d) => C.isFilled(d));
+    return html`<section class="card nodata-card">
+      <h2 class="h-sec"><${NoDataBadge} /> Match sans vidéo</h2>
+      <p>Pas de vidéo pour ce match : seul le score est enregistré, sans fiches de stats. Il compte dans le bilan de la saison (victoires, sets), pas dans les stats des joueurs.</p>
+      ${r && html`<p class="nodata-score"><b>ASVP ${r.a} – ${r.o} ${m.opponent}</b>${sets.length ? html` <span class="muted">(${sets.map((s) => s.a + "–" + s.o).join(", ")})</span>` : null}</p>`}
+      ${hasStats && html`<p class="warn small">Des fiches existent quand même pour ce match : elles sont conservées, mais masquées tant que le match est marqué NO VIDEO / NO DATA.</p>`}
+      ${!store.readOnly && html`<div class="row-btns"><button class="btn ghost" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${18} />La vidéo est arrivée ? Modifier le match</button></div>`}
+    </section>`;
+  }
+  function NoDataBadge({ sm }) {
+    return html`<span class=${cx("nodata-badge", sm && "sm")} title="Pas de vidéo : score seulement">NO VIDEO / NO DATA</span>`;
   }
   function PlayerDetail({ p, m }) {
     const [busy, setBusy] = useState(false);

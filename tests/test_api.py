@@ -78,3 +78,12 @@ def test_match_squad(team):
     assert r.status_code == 200
     assert team.get("/api/state").get_json()["matches"]["m-exemple"]["squad"] == ["joueur-a", "joueur-b"]
     assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "squad": "joueur-a"}).status_code == 400
+
+
+def test_match_without_video(team):
+    r = team.put("/api/matches/m-sans-video", json={"opponent": "Club Exemple", "noData": True, "result": {"a": 1, "o": 3}})
+    assert r.status_code == 200
+    m = team.get("/api/state").get_json()["matches"]["m-sans-video"]
+    assert m["noData"] is True and m["result"] == {"a": 1, "o": 3}
+    assert team.put("/api/matches/m-sans-score", json={"opponent": "Club Exemple", "noData": True}).status_code == 400
+    assert team.get("/api/state").get_json()["matches"]["m-exemple"]["noData"] is False

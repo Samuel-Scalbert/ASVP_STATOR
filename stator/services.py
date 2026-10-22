@@ -68,6 +68,7 @@ def match_doc(m: Match) -> dict:
         "date": m.match_date.isoformat() if m.match_date else "",
         "venue": m.venue or "", "competition": m.competition or "", "video": m.video_url or "",
         "squad": [p for p in (m.squad or "").split(",") if p],
+        "noData": bool(m.no_data),
         "sets": [{"a": s.asvp, "o": s.opp} for s in m.set_scores],
         "result": result, "source": m.source or "",
         "createdAt": _iso(m.created_at), "updatedAt": _iso(m.updated_at),
@@ -165,6 +166,9 @@ def save_match(match_id: str, doc: dict) -> Match:
     if not isinstance(squad, list):
         raise InvalidData("Liste des joueurs du match invalide.")
     m.squad = ",".join(dict.fromkeys(_check_id(p, "joueur") for p in squad))
+    m.no_data = doc.get("noData") is True
+    if m.no_data and not sets and not isinstance(result, dict):
+        raise InvalidData("Un match NO VIDEO / NO DATA doit avoir son score : le détail des sets ou le résultat en sets.")
     m.source = str(doc.get("source") or m.source or "")[:200]
     if isinstance(result, dict):
         m.result_asvp = _int(result.get("a"), "Sets gagnés", 0, 3)

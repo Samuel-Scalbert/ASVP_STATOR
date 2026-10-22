@@ -48,6 +48,7 @@ class Match(db.Model):
     competition: Mapped[str] = mapped_column(String(120), default="")
     video_url: Mapped[str] = mapped_column(String(300), default="")  # lien YouTube du match
     squad: Mapped[str] = mapped_column(Text, default="")  # joueurs du match : ids séparés par des virgules (vide = tout l'effectif)
+    no_data: Mapped[bool] = mapped_column(Boolean, default=False)  # « NO VIDEO / NO DATA » : score seulement, pas de fiches
     # Résultat en sets, utilisé seulement quand le détail des sets n'est pas connu.
     result_asvp: Mapped[int | None] = mapped_column(Integer)
     result_opp: Mapped[int | None] = mapped_column(Integer)

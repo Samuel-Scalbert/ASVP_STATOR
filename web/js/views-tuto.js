@@ -218,7 +218,7 @@
             <h2 class="h-sec"><span class="sec-n">5</span>Lire les écrans</h2>
             <dl class="calc">
               <dt>Matchs</dt><dd>Le dernier match en grand, avec le nombre de fiches remplies, puis la liste de tous les matchs.</dd>
-              <dt>Nouveau match</dt><dd>Créer un match à partir d’un modèle (championnat à domicile ou à l’extérieur, coupe, amical, match retour), puis cocher les joueurs du match : seuls eux comptent dans le suivi des saisies.</dd>
+              <dt>Nouveau match</dt><dd>Créer un match à partir d’un modèle (championnat à domicile ou à l’extérieur, coupe, amical, match retour), puis cocher les joueurs du match : seuls eux comptent dans le suivi des saisies. Sans vidéo, l’option « score seulement » enregistre juste le score et marque le match NO VIDEO / NO DATA.</dd>
               <dt>Match › Synthèse</dt><dd>Qui a rempli sa fiche, les points et fautes de l’équipe, les taux par geste, d’où viennent les points de chaque set, et ce qu’on laisse à l’adversaire.</dd>
               <dt>Match › Joueurs</dt><dd>Le classement des joueurs (points, fautes, différence) et leurs taux, pour le match entier ou un set. Plus bas, « Détail set par set » montre un tableau joueurs × sets, comme les feuilles STATS de l’Excel.</dd>
               <dt>Match › Bilans</dt><dd>Tous les bilans collectifs (les + et les −) regroupés, puis les bilans perso de chaque joueur.</dd>
@@ -278,6 +278,7 @@
           <section class="card" id="tuto-faq">
             <h2 class="h-sec"><span class="sec-n">8</span>Questions fréquentes</h2>
             <dl class="faq">
+              <dt>On n’a pas la vidéo d’un match.</dt><dd>À la création (ou avec « Modifier »), coche « Pas de vidéo : score seulement » et renseigne le score. Le match est marqué NO VIDEO / NO DATA : il compte dans les victoires et les sets de la saison, sans fiches à remplir. Si la vidéo arrive plus tard, décoche l’option.</dd>
               <dt>Un joueur n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
               <dt>J’ai touché la mauvaise case.</dt><dd>Le − dans le coin de la case retire 1 ; « Annuler » en bas efface la dernière touche.</dd>
               <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : sur PC, la vidéo s’affiche à côté des cases. Avec « Joueur suivant », une seule personne saisit toute l’équipe en revoyant le match.</dd>

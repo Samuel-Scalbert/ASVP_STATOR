@@ -413,13 +413,14 @@
 
   /* matches : [{ match, players: [{ id, name, doc }] }] trié par date. */
   function seasonWorkbookSpec(entries, roster) {
-    const ms = { A1: "Date", B1: "Adversaire", C1: "Lieu", D1: "Compétition", E1: "Résultat", F1: "Score des sets", G1: "Joueurs ayant saisi" };
+    const ms = { A1: "Date", B1: "Adversaire", C1: "Lieu", D1: "Compétition", E1: "Résultat", F1: "Score des sets", G1: "Joueurs ayant saisi", H1: "Stats" };
     entries.forEach((e, i) => {
       const r = i + 2, m = e.match, res = matchResult(m);
       ms["A" + r] = m.date || ""; ms["B" + r] = m.opponent || ""; ms["C" + r] = m.venue === "dom" ? "Domicile" : m.venue === "ext" ? "Extérieur" : "";
       ms["D" + r] = m.competition || ""; ms["E" + r] = res ? res.a + "-" + res.o : "";
       ms["F" + r] = matchSets(m).map((s) => s.a + "-" + s.o).join(" / ");
-      ms["G" + r] = e.players.filter((p) => isFilled(p.doc)).length;
+      ms["G" + r] = m.noData ? 0 : e.players.filter((p) => isFilled(p.doc)).length;
+      ms["H" + r] = m.noData ? "NO VIDEO / NO DATA" : "";
     });
     const heads = ["Joueur", "Matchs saisis", "Points", "dont attaque", "dont service", "dont bloc", "Fautes", "+/-",
       "Taux service", "Taux réception", "Taux passe", "Taux attaque", "Taux bloc"];
@@ -430,7 +431,7 @@
       const r = i + 2;
       const all = [];
       let n = 0;
-      entries.forEach((e) => { const p = e.players.find((x) => x.id === pl.id); if (p && isFilled(p.doc)) { n++; all.push.apply(all, setsArray(p.doc)); } });
+      entries.forEach((e) => { const p = e.players.find((x) => x.id === pl.id); if (p && !e.match.noData && isFilled(p.doc)) { n++; all.push.apply(all, setsArray(p.doc)); } });
       const sl = scoreLine(all);
       const row = [pl.name, n, sl.P, sl.pts.attaque, sl.pts.service, sl.pts.bloc, sl.F, sl.diff,
         PCT(sumSkill(all, "service").rate), PCT(sumSkill(all, "reception").rate), PCT(sumSkill(all, "passe").rate),
@@ -444,7 +445,7 @@
     ["Date", "Adversaire", "Joueur", "Set"].concat(fieldCols.map(({ s, f }) => s.label + " " + f.label.toLowerCase() + (f.p ? " P" + f.p : "")))
       .forEach((h, i) => { det[colName(i) + 1] = h; });
     let r = 2;
-    entries.forEach((e) => e.players.forEach((p) => setsArray(p.doc).forEach((set, si) => {
+    entries.forEach((e) => !e.match.noData && e.players.forEach((p) => setsArray(p.doc).forEach((set, si) => {
       if (!set || !countActions(set)) return;
       det["A" + r] = e.match.date || ""; det["B" + r] = e.match.opponent || ""; det["C" + r] = p.name; det["D" + r] = si + 1;
       fieldCols.forEach(({ s, f }, j) => { det[colName(4 + j) + r] = setVal(set, s.key, f.k); });
