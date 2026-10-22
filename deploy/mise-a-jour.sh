@@ -11,6 +11,15 @@ GARDER=20  # nombre de sauvegardes conservées
 main() {
   cd "$PROJET"
 
+  if [ ! -d .git ]; then
+    echo "Le dossier $PROJET n'a pas été installé avec « git clone » (fichiers envoyés ou ZIP) :"
+    echo "il ne peut pas récupérer les mises à jour. Réinstalle-le avec git, voir DEPLOIEMENT.md, partie 1b :"
+    echo "  cd ~ && mv ASVP_STATOR ASVP_STATOR_ancien"
+    echo "  git clone https://github.com/Samuel-Scalbert/ASVP_STATOR.git"
+    echo "puis remets ta base si tu en avais une :  cp ASVP_STATOR_ancien/instance/stator.db ASVP_STATOR/instance/"
+    exit 1
+  fi
+
   echo "1/4 Sauvegarde de la base"
   mkdir -p instance/sauvegardes
   if [ -f instance/stator.db ]; then
