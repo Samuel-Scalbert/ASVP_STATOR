@@ -105,7 +105,8 @@
     let view = route.view;
     if ((view === "entry" || view === "match") && store.ready && !store.matches[route.matchId]) view = "home";
     if (view === "entry" && (!meValid || store.readOnly)) view = store.ready ? "match" : view;
-    if (view === "entry" && store.ready && store.matches[route.matchId] && store.matches[route.matchId].noData) view = "match"; // pas de fiches pour un match NO VIDEO / NO DATA
+    const em = store.ready && store.matches[route.matchId];
+    if (view === "entry" && em && (em.noData || em.closed)) view = "match"; // pas de saisie : match sans vidéo, ou saisie close
     const active = view === "entry" || view === "match" ? "home" : view === "guide" ? "tuto" : view;
     const loading = !store.ready;
     if (loading && view === "entry") view = "loading";

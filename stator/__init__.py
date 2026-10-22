@@ -62,6 +62,13 @@ def _upgrade_schema() -> None:
             conn.execute(text("ALTER TABLE matches ADD COLUMN squad TEXT DEFAULT ''"))
         if "no_data" not in columns:
             conn.execute(text("ALTER TABLE matches ADD COLUMN no_data BOOLEAN DEFAULT 0"))
+        if "video_kind" not in columns:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN video_kind VARCHAR(10) DEFAULT ''"))
+            conn.execute(text("UPDATE matches SET video_kind = 'lien' WHERE video_url <> ''"))
+        if "video_note" not in columns:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN video_note VARCHAR(200) DEFAULT ''"))
+        if "closed" not in columns:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN closed BOOLEAN DEFAULT 0"))
         for view in ("v_player_match", "v_player_skill", "v_stats_detail"):  # vues d'analyse retirées
             conn.execute(text(f"DROP VIEW IF EXISTS {view}"))
 

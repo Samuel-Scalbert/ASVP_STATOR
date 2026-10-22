@@ -87,3 +87,13 @@ def test_match_without_video(team):
     assert m["noData"] is True and m["result"] == {"a": 1, "o": 3}
     assert team.put("/api/matches/m-sans-score", json={"opponent": "Club Exemple", "noData": True}).status_code == 400
     assert team.get("/api/state").get_json()["matches"]["m-exemple"]["noData"] is False
+
+
+def test_video_on_discord_and_closed_match(team):
+    r = team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "videoKind": "discord",
+                                                  "videoNote": "match-retour.mp4", "video": "https://ignore.me", "closed": True})
+    assert r.status_code == 200
+    m = team.get("/api/state").get_json()["matches"]["m-exemple"]
+    assert (m["videoKind"], m["videoNote"], m["video"], m["closed"]) == ("discord", "match-retour.mp4", "", True)
+    assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "videoKind": "cassette"}).status_code == 400
+    assert team.put("/api/matches/m-exemple", json={"opponent": "Club Exemple", "videoKind": "lien", "video": ""}).status_code == 400

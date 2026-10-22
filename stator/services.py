@@ -11,6 +11,7 @@ from .referentiel import field_ids
 
 ID_RE = re.compile(r"^[A-Za-z0-9_\-.~:@+]{1,170}$")
 VENUES = {"", "dom", "ext"}
+VIDEO_KINDS = {"", "lien", "discord"}
 
 
 class InvalidData(ValueError):
@@ -69,6 +70,9 @@ def match_doc(m: Match) -> dict:
         "venue": m.venue or "", "competition": m.competition or "", "video": m.video_url or "",
         "squad": [p for p in (m.squad or "").split(",") if p],
         "noData": bool(m.no_data),
+        "videoKind": m.video_kind or ("lien" if m.video_url else ""),
+        "videoNote": m.video_note or "",
+        "closed": bool(m.closed),
         "sets": [{"a": s.asvp, "o": s.opp} for s in m.set_scores],
         "result": result, "source": m.source or "",
         "createdAt": _iso(m.created_at), "updatedAt": _iso(m.updated_at),
@@ -159,9 +163,17 @@ def save_match(match_id: str, doc: dict) -> Match:
     m.venue = venue
     m.competition = str(doc.get("competition") or "")[:120]
     video = str(doc.get("video") or "").strip()
-    if video and not re.match(r"^https?://", video):
+    kind = doc.get("videoKind")
+    if kind is None:  # anciens clients : un lien suffit à dire qu'il y a une vidéo
+        kind = "lien" if video else ""
+    if kind not in VIDEO_KINDS:
+        raise InvalidData("Type de vidéo invalide.")
+    if kind == "lien" and not re.match(r"^https?://", video):
         raise InvalidData("Le lien de la vidéo doit commencer par http:// ou https://.")
-    m.video_url = video[:300]
+    m.video_kind = kind
+    m.video_url = video[:300] if kind == "lien" else ""
+    m.video_note = str(doc.get("videoNote") or "").strip()[:200] if kind == "discord" else ""
+    m.closed = doc.get("closed") is True
     squad = doc.get("squad") or []
     if not isinstance(squad, list):
         raise InvalidData("Liste des joueurs du match invalide.")

@@ -604,6 +604,13 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .newmatch-grid .tpl-list { grid-template-columns: 1fr; }
 }
 
+/* ---------- Type de match, saisie close, vidéo sur Discord ---------- */
+.type-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.closed-badge { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--good-bg); color: var(--good-ink); }
+.closed-badge.band { background: var(--band-wash); color: var(--band-ink); border: 1px solid var(--band-line); }
+.closed-note { border-left: 4px solid var(--line-2); padding: 6px 0 6px 12px; color: var(--ink-2); font-size: 14px; }
+.video-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 13px; border-radius: 999px; border: 1px dashed var(--band-line); color: var(--band-ink); font-size: 14px; font-weight: 600; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
 /* ---------- Match sans vidéo (NO VIDEO / NO DATA) ---------- */
 .nodata-badge { display: inline-flex; align-items: center; white-space: nowrap; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; border-radius: 6px; padding: 3px 8px; background: var(--surface-2); color: var(--ink-2); border: 1px dashed var(--line-2); vertical-align: 2px; }
 .nodata-badge.sm { font-size: 10.5px; padding: 2px 6px; }

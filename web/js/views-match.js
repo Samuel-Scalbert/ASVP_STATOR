@@ -67,10 +67,11 @@
         <div class="hero-state">
           ${m.noData
             ? html`<span><${NoDataBadge} /> Pas de vidéo : seul le score est enregistré.</span>`
+            : m.closed ? html`<span><${ClosedBadge} band /> ${U.plural(comp.done, "fiche remplie", "fiches remplies")}</span>`
             : html`${state && html`<span>Ta fiche : <b>${state}</b></span>`}<span>${comp.done}/${comp.total} joueurs ont saisi</span>`}
         </div>
         <div class="hero-actions">
-          ${!store.readOnly && !m.noData && html`<button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
+          ${!store.readOnly && !m.noData && !m.closed && html`<button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
           <button class="btn on-band-ghost" onClick=${() => go({ view: "match", matchId: m.id })}>Voir le match</button>
         </div>
       </div>
@@ -118,7 +119,7 @@
               <span class="mr-date">${m.date ? shortDate(m.date) : "Date ?"}</span>
               <span class="mr-main"><b>${m.opponent}</b><small>${[venueLabel(m.venue), m.competition].filter(Boolean).join(" · ") || "Match"}</small></span>
               <${ResultChip} m=${m} />
-              ${m.noData ? html`<${NoDataBadge} sm />` : html`<span class="mr-comp" title="Joueurs ayant saisi">${comp.done}/${comp.total}</span>`}
+              ${m.noData ? html`<${NoDataBadge} sm />` : m.closed ? html`<span class="mr-comp" title="Saisie close">Close</span>` : html`<span class="mr-comp" title="Joueurs ayant saisi">${comp.done}/${comp.total}</span>`}
               <${Icon} name="next" size=${18} />
             </button></li>`;
           })}
@@ -138,8 +139,10 @@
     const [opp, setOpp] = useState(m ? m.opponent : p.opponent || "");
     const [date, setDate] = useState(m ? m.date || "" : new Date().toISOString().slice(0, 10));
     const [venue, setVenue] = useState(m ? m.venue || "" : p.venue != null ? p.venue : "dom");
-    const [comp, setComp] = useState(m ? m.competition || "" : p.competition || "");
+    const [comp, setComp] = useState(m ? m.competition || "" : p.competition || "Départementale");
     const [video, setVideo] = useState(m ? m.video || "" : "");
+    const [videoKind, setVideoKind] = useState(m ? m.videoKind || (m.video ? "lien" : "") : "");
+    const [videoNote, setVideoNote] = useState(m ? m.videoNote || "" : "");
     const [noData, setNoData] = useState(m ? !!m.noData : !!p.noData);
     const [squad, setSquad] = useState(() => (m && Array.isArray(m.squad) && m.squad.length ? m.squad.slice() : activeIds));
     const init = C.matchSets(m || {});
@@ -154,7 +157,9 @@
     const choices = roster.filter((x) => x.active !== false || squad.indexOf(x.id) >= 0);
     const uniq = (arr) => arr.filter((v, i) => v && arr.findIndex((w) => C.norm(w) === C.norm(v)) === i);
     const opponents = uniq(past.map((x) => x.opponent));
-    const competitions = uniq(["Championnat", "Coupe", "Amical"].concat(past.map((x) => x.competition)));
+    // L’équipe ne joue que deux sortes de matchs : départementale (domicile ou extérieur) et amical.
+    const TYPES = [["Départementale", "Match départemental", "À domicile ou à l’extérieur"], ["Amical", "Match amical", "Hors championnat"]];
+    const isType = (k) => C.norm(comp) === C.norm(k);
     const toggle = (id) => setSquad(squad.indexOf(id) >= 0 ? squad.filter((x) => x !== id) : squad.concat([id]));
     const submit = (e) => {
       e.preventDefault();
@@ -162,10 +167,13 @@
       const res = fromSets ? null : (Number.isFinite(parseInt(ra, 10)) && Number.isFinite(parseInt(ro, 10)) ? { a: parseInt(ra, 10), o: parseInt(ro, 10) } : null);
       if (noData && !sets.length && !res) { setErr("Renseigne le score : le détail des sets, ou au moins le résultat en sets."); return; }
       if (!noData && choices.length && !squad.length) { setErr("Coche au moins un joueur du match."); return; }
-      if (!noData && video.trim() && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
+      if (!noData && videoKind === "lien" && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
       const order = roster.map((x) => x.id);
       const doc = Object.assign({}, m || { id: C.uid("m-"), createdAt: new Date().toISOString() }, {
-        opponent: opp.trim(), date, venue, competition: comp.trim(), video: noData ? "" : video.trim(), sets, result: res, noData,
+        opponent: opp.trim(), date, venue, competition: comp.trim(), sets, result: res, noData,
+        videoKind: noData ? "" : videoKind,
+        video: !noData && videoKind === "lien" ? video.trim() : "",
+        videoNote: !noData && videoKind === "discord" ? videoNote.trim() : "",
         squad: noData ? [] : squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
       });
       api.saveMatch(doc);
@@ -186,6 +194,12 @@
             <span>–</span><input id="f-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>${opp.trim() || "Adv."}</span>
           </div></div>`}`;
     return html`<form class="form" onSubmit=${submit}>
+      <div class="field"><span class="lbl"><b>Type de match</b></span>
+        <div class="type-pick" role="radiogroup" aria-label="Type de match">
+          ${TYPES.map(([k, l, sub]) => html`<button type="button" key=${k} role="radio" aria-checked=${isType(k)} class=${cx("tpl", isType(k) && "on")} onClick=${() => setComp(k)}><b>${l}</b><small>${sub}</small></button>`)}
+        </div>
+        ${comp && !TYPES.some(([k]) => isType(k)) ? html`<small class="muted">Type enregistré : ${comp}. Choisis l’un des deux pour le remplacer.</small>` : null}
+      </div>
       <div class="field"><label for="f-opp"><b>Adversaire</b></label>
         <input id="f-opp" data-autofocus list="f-opp-list" value=${opp} onInput=${(e) => { setOpp(e.target.value); setErr(""); }} placeholder="Nom du club adverse" autocomplete="off" />
         <datalist id="f-opp-list">${opponents.map((o) => html`<option key=${o} value=${o}></option>`)}</datalist></div>
@@ -196,9 +210,6 @@
             ${[["dom", "Domicile"], ["ext", "Extérieur"]].map(([k, l]) => html`<button type="button" key=${k} class=${venue === k ? "on" : ""} aria-pressed=${venue === k} onClick=${() => setVenue(venue === k ? "" : k)}>${l}</button>`)}
           </div></div>
       </div>
-      <div class="field"><label for="f-comp"><b>Compétition</b><small>Facultatif</small></label>
-        <input id="f-comp" list="f-comp-list" value=${comp} onInput=${(e) => setComp(e.target.value)} placeholder="Ex. : Championnat, Coupe" autocomplete="off" />
-        <datalist id="f-comp-list">${competitions.map((o) => html`<option key=${o} value=${o}></option>`)}</datalist></div>
       <label class=${cx("nodata-toggle", noData && "on")} for="f-nodata">
         <input id="f-nodata" type="checkbox" checked=${noData} onChange=${(e) => { setNoData(e.target.checked); setErr(""); }} />
         <span><b>Pas de vidéo : score seulement</b>
@@ -217,9 +228,15 @@
             <span class="squad-name">${x.name}${q.posteLabel(x.id) ? html`<small>${q.posteLabel(x.id)}</small>` : null}</span></button>`; })}
         </div>
       </fieldset>` : html`<p class="muted small">L’effectif est vide : ajoute les joueurs dans l’onglet Équipe pour choisir qui joue ce match.</p>`}
-      ${!noData && html`<div class="field"><label for="f-video"><b>Vidéo YouTube du match</b><small>Facultatif : colle le lien de la vidéo</small></label>
-        <input id="f-video" type="url" inputmode="url" value=${video} onInput=${(e) => { setVideo(e.target.value); setErr(""); }} placeholder="https://youtu.be/…" autocomplete="off" />
-        ${video.trim() && /^https?:\/\//i.test(video.trim()) && !U.youtubeEmbed(video) ? html`<small class="warn">Ce lien n’est pas reconnu comme une vidéo YouTube : il s’ouvrira simplement dans un nouvel onglet.</small>` : null}</div>`}
+      ${!noData && html`<fieldset class="field"><legend><b>Vidéo du match</b><small>Facultatif</small></legend>
+        <div class="seg-ctl" role="group" aria-label="Vidéo du match">
+          ${[["", "Aucune"], ["lien", "Lien YouTube"], ["discord", "Fichier sur Discord"]].map(([k, l]) => html`<button type="button" key=${k || "aucune"} class=${videoKind === k ? "on" : ""} aria-pressed=${videoKind === k} onClick=${() => { setVideoKind(k); setErr(""); }}>${l}</button>`)}
+        </div>
+        ${videoKind === "lien" && html`<input id="f-video" type="url" inputmode="url" aria-label="Lien de la vidéo" value=${video} onInput=${(e) => { setVideo(e.target.value); setErr(""); }} placeholder="https://youtu.be/…" autocomplete="off" />
+          ${video.trim() && /^https?:\/\//i.test(video.trim()) && !U.youtubeEmbed(video) ? html`<small class="warn">Ce lien n’est pas reconnu comme une vidéo YouTube : il s’ouvrira simplement dans un nouvel onglet.</small>` : null}`}
+        ${videoKind === "discord" && html`<input id="f-video-note" aria-label="Nom du fichier sur Discord" value=${videoNote} onInput=${(e) => setVideoNote(e.target.value)} placeholder="Nom du fichier (facultatif), ex. : ASVP-match.mp4" autocomplete="off" />
+          <small class="muted">La vidéo est un fichier enregistré sur Discord : l’app garde seulement cette mention.</small>`}
+      </fieldset>`}
       ${editing || noData || sets.length || ra || ro
         ? html`<fieldset class="field"><legend><b>Score des sets</b><small>${noData ? "Obligatoire : le détail des sets, ou au moins le résultat en sets." : "Facultatif, mais il permet de vérifier les stats saisies."}</small></legend>${scoreFields}</fieldset>`
         : html`<details class="score-later"><summary>Le match est déjà joué ? Renseigner le score</summary>
@@ -229,57 +246,21 @@
     </form>`;
   }
 
-  /* ---------- Onglet « Nouveau match » : un modèle, puis les infos du match ---------- */
+  /* ---------- Onglet « Nouveau match » ---------- */
   function NewMatch({ go }) {
-    const [tpl, setTpl] = useState("libre");
-    const past = q.matchList();
-    const flip = (v) => (v === "dom" ? "ext" : v === "ext" ? "dom" : "");
-    const placeLabel = (v) => (v === "dom" ? "à domicile" : v === "ext" ? "à l’extérieur" : "lieu à choisir");
-    const templates = [
-      { k: "libre", label: "Sans modèle", sub: "Tout est à remplir", preset: {} },
-      { k: "champ-dom", label: "Championnat à domicile", sub: "Compétition et lieu déjà remplis", preset: { competition: "Championnat", venue: "dom" } },
-      { k: "champ-ext", label: "Championnat à l’extérieur", sub: "Compétition et lieu déjà remplis", preset: { competition: "Championnat", venue: "ext" } },
-      { k: "coupe", label: "Coupe", sub: "Compétition déjà remplie", preset: { competition: "Coupe", venue: "" } },
-      { k: "amical", label: "Match amical", sub: "Compétition déjà remplie", preset: { competition: "Amical", venue: "" } },
-      { k: "no-data", label: "Score seulement (pas de vidéo)", sub: "Marqué NO VIDEO / NO DATA, sans fiches à remplir", preset: { noData: true } },
-    ];
-    // Matchs retour : un adversaire rencontré une seule fois, avec le lieu inversé.
-    const seen = {};
-    past.forEach((x) => { const k = C.norm(x.opponent); seen[k] = (seen[k] || 0) + 1; });
-    const retours = [];
-    past.forEach((x) => {
-      const k = C.norm(x.opponent);
-      if (seen[k] !== 1 || retours.length >= 4) return;
-      retours.push({ k: "retour-" + x.id, label: "Retour contre " + x.opponent, sub: (x.competition || "Match") + " · " + placeLabel(flip(x.venue)),
-        preset: { opponent: x.opponent, competition: x.competition || "", venue: flip(x.venue) } });
-    });
-    const all = templates.concat(retours);
-    const cur = all.find((t) => t.k === tpl) || all[0];
     if (store.readOnly) {
       return html`<div class="page"><p class="notice ro">Tu consultes l’app en lecture seule : tu ne peux pas créer de match.</p></div>`;
     }
-    return html`<div class="page wide">
+    return html`<div class="page">
       <div class="tuto-head">
         <span class="eyebrow">Nouveau match</span>
         <h1 class="h-page">Créer un match</h1>
-        <p class="lead">Choisis un modèle pour gagner du temps, complète les infos, puis chaque joueur du match remplit sa fiche.</p>
+        <p class="lead">Match départemental ou amical : complète les infos, coche les joueurs du match, puis chacun remplit sa fiche.</p>
       </div>
-      <div class="newmatch-grid">
-        <section class="card">
-          <h2 class="h-sec">1. Modèle</h2>
-          <div class="tpl-list" role="radiogroup" aria-label="Modèle de match">
-            ${templates.map((t) => html`<button type="button" key=${t.k} role="radio" aria-checked=${cur.k === t.k} class=${cx("tpl", cur.k === t.k && "on")} onClick=${() => setTpl(t.k)}><b>${t.label}</b><small>${t.sub}</small></button>`)}
-          </div>
-          ${retours.length ? html`<h3 class="h-sub">Matchs retour</h3>
-            <div class="tpl-list" role="radiogroup" aria-label="Matchs retour">
-              ${retours.map((t) => html`<button type="button" key=${t.k} role="radio" aria-checked=${cur.k === t.k} class=${cx("tpl", cur.k === t.k && "on")} onClick=${() => setTpl(t.k)}><b>${t.label}</b><small>${t.sub}</small></button>`)}
-            </div>` : null}
-        </section>
-        <section class="card">
-          <h2 class="h-sec">2. Infos du match</h2>
-          <${MatchForm} key=${cur.k} preset=${cur.preset} onDone=${(doc) => { U.toast("Match créé : ASVP – " + doc.opponent + "."); go({ view: "match", matchId: doc.id }); }} />
-        </section>
-      </div>
+      <section class="card">
+        <${MatchForm} preset=${{ competition: "Départementale", venue: "dom" }}
+          onDone=${(doc) => { U.toast("Match créé : ASVP – " + doc.opponent + "."); go({ view: "match", matchId: doc.id }); }} />
+      </section>
     </div>`;
   }
 
@@ -302,6 +283,14 @@
   /* ---------- Vue d’un match ---------- */
   function Completion({ comp, me, m, go }) {
     const mine = me ? comp.ps.find((p) => p.id === me) : null;
+    if (m.closed) {
+      const done = comp.ps.filter((p) => C.isFilled(p.doc));
+      return html`<section class="card">
+        <div class="block-head"><h2 class="h-sec">Saisies</h2><${ClosedBadge} /></div>
+        <p>${U.plural(done.length, "fiche remplie", "fiches remplies")} sur ${comp.total} joueurs du match. La saisie est terminée : les points non notés ne sont pas comptabilisés.</p>
+        <div class="chips">${done.map((p) => html`<span key=${p.id} class="chip done"><${Icon} name="check" size=${13} />${p.name}</span>`)}</div>
+      </section>`;
+    }
     return html`<section class="card">
       <div class="block-head"><h2 class="h-sec">Saisies</h2><span class="muted">${comp.done} sur ${comp.total} joueurs</span></div>
       <div class="chips">
@@ -309,6 +298,7 @@
           ${C.isFilled(p.doc) && html`<${Icon} name="check" size=${13} />`}${p.name}</span>`)}
       </div>
       ${me && !store.readOnly && (!mine || !C.isFilled(mine.doc)) && html`<div class="row-btns"><button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>Saisir mes stats</button></div>`}
+      <p class="muted small">Quand tout le monde a fini, « Clôturer la saisie » (en haut) arrête le suivi : l’écart avec le score sera compté comme points non notés.</p>
     </section>`;
   }
   function ScoreCheck({ m, perSet, openForm }) {
@@ -316,30 +306,36 @@
     if (!sets.length) {
       return html`<section class="card">
         <h2 class="h-sec">Score et stats</h2>
-        <p class="muted">Renseigne le score des sets pour voir quelle part des points vient des actions saisies et quelle part des fautes adverses.</p>
+        <p class="muted">Renseigne le score des sets pour comparer le score avec les points notés dans les fiches.</p>
         ${!store.readOnly && html`<button class="btn ghost sm" onClick=${openForm}>Renseigner le score</button>`}
       </section>`;
     }
+    const closed = !!m.closed;
     const totA = sets.reduce((t, s) => t + s.a, 0), totO = sets.reduce((t, s) => t + s.o, 0);
+    const missing = sets.reduce((t, s, i) => t + Math.max(0, s.a - perSet[i].P) + Math.max(0, s.o - perSet[i].F), 0);
     return html`<section class="card">
-      <h2 class="h-sec">D’où viennent les points</h2>
-      <p class="muted small">Comparaison du score avec les stats saisies (la « vérification avec score final » de l’Excel).</p>
+      <h2 class="h-sec">${closed ? "Points notés et non notés" : "D’où viennent les points"}</h2>
+      <p class="muted small">Comparaison du score avec les points notés dans les fiches (la « vérification avec score final » de l’Excel).</p>
       <div class="score-rows">
         ${sets.map((s, i) => {
           const P = perSet[i].P, F = perSet[i].F;
           return html`<div class="score-row" key=${i}>
             <div class="sr-head"><b>Set ${i + 1}</b><span>${s.a}–${s.o}</span></div>
-            <div class="stack" role="img" aria-label=${"Set " + (i + 1) + " : " + P + " points sur nos actions, " + Math.max(0, s.a - P) + " autres"}>
+            <div class="stack" role="img" aria-label=${"Set " + (i + 1) + " : " + P + " points notés, " + Math.max(0, s.a - P) + " non notés"}>
               <span class="stack-a" style=${{ flexGrow: Math.min(P, s.a) }}></span><span class="stack-b" style=${{ flexGrow: Math.max(0, s.a - P) }}></span>
             </div>
-            <div class="sr-txt"><b>ASVP ${s.a} pts</b> : ${P} sur nos actions saisies, ${s.a - P} sur fautes adverses ou non saisis</div>
-            <div class="sr-txt"><b>${m.opponent} ${s.o} pts</b> : ${F} sur nos fautes saisies, ${s.o - F} sur leurs actions ou non saisis</div>
+            ${closed
+              ? html`<div class="sr-txt"><b>ASVP ${s.a} pts</b> : ${U.plural(P, "noté", "notés")} · ${U.plural(Math.max(0, s.a - P), "non noté", "non notés")}</div>
+                  <div class="sr-txt"><b>${m.opponent} ${s.o} pts</b> : ${F} sur nos fautes notées · ${U.plural(Math.max(0, s.o - F), "non noté", "non notés")}</div>`
+              : html`<div class="sr-txt"><b>ASVP ${s.a} pts</b> : ${P} sur nos actions saisies, ${s.a - P} sur fautes adverses ou non saisis</div>
+                  <div class="sr-txt"><b>${m.opponent} ${s.o} pts</b> : ${F} sur nos fautes saisies, ${s.o - F} sur leurs actions ou non saisis</div>`}
             ${P > s.a || F > s.o ? html`<div class="sr-txt warn">Plus de points saisis que dans le score : une fiche est à vérifier.</div>` : null}
           </div>`;
         })}
         ${sets.length > 1 ? html`<div class="score-total"><b>Total des points</b><span>ASVP ${totA} – ${totO} ${m.opponent}</span></div>` : null}
       </div>
-      <ul class="legend"><li><span class="sw stack-a"></span>Points sur nos actions saisies</li><li><span class="sw stack-b"></span>Fautes adverses ou non saisis</li></ul>
+      ${closed && html`<p class="closed-note"><b>${missing} ${missing > 1 ? "points non notés" : "point non noté"}</b> sur ${totA + totO} (moments sans vidéo, ou fautes de l’adversaire, que la fiche ne note pas). Ils ne sont pas comptabilisés dans les stats.</p>`}
+      <ul class="legend"><li><span class="sw stack-a"></span>${closed ? "Points notés" : "Points sur nos actions saisies"}</li><li><span class="sw stack-b"></span>${closed ? "Points non notés (non comptabilisés)" : "Fautes adverses ou non saisis"}</li></ul>
     </section>`;
   }
   function Opponent({ allSets, nSets }) {
@@ -431,13 +427,14 @@
           <tr><th scope="row" class="left">Équipe</th>${cols.map((i) => html`<td key=${i}>${cell(teamSet(i))}</td>`)}<td>${cell([].concat.apply([], all.map((x) => x.sets)))}</td></tr>
           ${withScore ? html`<tr class="sub"><th scope="row" class="left">${d.k === "P" ? "Score ASVP" : "Score " + m.opponent}</th>
               ${cols.map((i) => html`<td key=${i}>${sc[i] ? scoreOf(sc[i]) : "–"}</td>`)}<td>${sc.reduce((t, s) => t + scoreOf(s), 0)}</td></tr>
-            <tr class="sub"><th scope="row" class="left">Écart avec le score</th>
+            <tr class="sub"><th scope="row" class="left">${m.closed ? "Points non notés (non comptabilisés)" : "Écart avec le score"}</th>
               ${cols.map((i) => html`<td key=${i}>${sc[i] ? scoreOf(sc[i]) - C.scoreLine(teamSet(i))[d.k] : "–"}</td>`)}
               <td>${sc.reduce((t, s) => t + scoreOf(s), 0) - C.scoreLine([].concat.apply([], all.map((x) => x.sets)))[d.k]}</td></tr>` : null}
         </tfoot>
       </table></div>
       <p class="muted small">${withScore
-        ? (d.k === "P" ? "Écart = points venus des fautes adverses ou d’actions non saisies." : "Écart = points marqués par l’adversaire sur ses propres actions, ou non saisis.")
+        ? (m.closed ? "Saisie close : les points non notés (moments sans vidéo, ou fautes de l’adversaire) ne sont pas comptabilisés."
+          : d.k === "P" ? "Écart = points venus des fautes adverses ou d’actions non saisies." : "Écart = points marqués par l’adversaire sur ses propres actions, ou non saisis.")
         : d.rate ? C.SKILL[d.k].rateText + ", set par set et sur le match." : "« – » : pas de stat sur ce set (joueur pas sur le terrain)."}</p>
     </section>`;
   }
@@ -486,7 +483,7 @@
       </section>
       <${SetDetail} m=${m} filled=${filled} nSets=${nSets} />`}
       ${sel && filled.length > rows.length ? html`<p class="muted small">Aucune stat sur le set ${sel} (pas joué) : ${filled.filter((p) => !C.countActions(C.setsArray(p.doc)[sel - 1])).map((p) => p.name).join(", ")}.</p>` : null}
-      ${missing.length ? html`<p class="muted small">Pas encore de fiche : ${missing.map((p) => p.name).join(", ")}.</p>` : null}`;
+      ${missing.length ? html`<p class="muted small">${m.closed ? "Sans fiche (saisie close)" : "Pas encore de fiche"} : ${missing.map((p) => p.name).join(", ")}.</p>` : null}`;
   }
   function Bilans({ m }) {
     const ps = q.playersOf(m.id).filter((p) => p.doc && C.hasBilan(p.doc));
@@ -526,6 +523,10 @@
       setBusy(false);
     };
     const tabs = [["synthese", "Synthèse"], ["joueurs", "Joueurs"], ["bilans", "Bilans"]];
+    const toggleClosed = () => {
+      api.saveMatch(Object.assign({}, m, { closed: !m.closed, updatedAt: new Date().toISOString() }));
+      U.toast(m.closed ? "Saisie rouverte : les joueurs peuvent à nouveau remplir leur fiche." : "Saisie close : les points non notés ne sont pas comptabilisés.");
+    };
     return html`<div>
       <section class="match-band">
         <div class="match-band-in">
@@ -535,11 +536,14 @@
             <div class="board sm"><span class="board-team">ASVP</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}</span></div>
             <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}</div>
             ${m.noData && html`<div class="board-sets"><${NoDataBadge} /></div>`}
+            ${m.closed && !m.noData && html`<div class="board-sets"><${ClosedBadge} band /></div>`}
           </div>
         </div>
         <div class="match-actions">
-          ${!store.readOnly && !m.noData && html`<button class="btn primary sm" onClick=${() => go({ view: "entry", matchId })}>Saisir les stats</button>`}
+          ${!store.readOnly && !m.noData && !m.closed && html`<button class="btn primary sm" onClick=${() => go({ view: "entry", matchId })}>Saisir les stats</button>`}
           ${m.video && html`<a class="btn on-band-ghost sm" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} />Vidéo YouTube</a>`}
+          ${m.videoKind === "discord" && html`<span class="video-chip" title=${m.videoNote || ""}><${Icon} name="play" size=${15} />Vidéo : fichier sur Discord${m.videoNote ? " · " + m.videoNote : ""}</span>`}
+          ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${toggleClosed}><${Icon} name=${m.closed ? "undo" : "check"} size=${16} />${m.closed ? "Rouvrir la saisie" : "Clôturer la saisie"}</button>`}
           ${!m.noData && html`<button class="btn on-band-ghost sm" onClick=${doExport} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Excel"}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Modifier</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "delete", m })} aria-label="Supprimer le match"><${Icon} name="trash" size=${16} /></button>`}
@@ -566,6 +570,9 @@
       ${hasStats && html`<p class="warn small">Des fiches existent quand même pour ce match : elles sont conservées, mais masquées tant que le match est marqué NO VIDEO / NO DATA.</p>`}
       ${!store.readOnly && html`<div class="row-btns"><button class="btn ghost" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${18} />La vidéo est arrivée ? Modifier le match</button></div>`}
     </section>`;
+  }
+  function ClosedBadge({ band }) {
+    return html`<span class=${cx("closed-badge", band && "band")}><${Icon} name="check" size=${13} />Saisie close</span>`;
   }
   function NoDataBadge({ sm }) {
     return html`<span class=${cx("nodata-badge", sm && "sm")} title="Pas de vidéo : score seulement">NO VIDEO / NO DATA</span>`;

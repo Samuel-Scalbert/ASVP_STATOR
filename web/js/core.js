@@ -353,7 +353,7 @@
       tot.forEach((v, i) => { sp[SET_COLS[i] + r] = v; });
       sp["J" + r] = tot.reduce((a, b) => a + b, 0); r++;
       if (scoreRow && sets.length) {
-        sp["C" + r] = "Écart avec le score (fautes adverses ou actions non saisies)";
+        sp["C" + r] = match.closed ? "Points non notés (non comptabilisés)" : "Écart avec le score (fautes adverses ou actions non saisies)";
         for (let i = 0; i < sets.length && i < nSheetsSets; i++) sp[SET_COLS[i] + r] = (scoreRow === "a" ? sets[i].a : sets[i].o) - tot[i];
         r++;
       }

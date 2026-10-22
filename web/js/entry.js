@@ -273,7 +273,9 @@
       ? embed
         ? html`<button class=${cx("btn sm on-band-ghost video-btn", showVideo && "on")} aria-pressed=${showVideo} onClick=${() => toggle(!showVideo)}><${Icon} name="play" size=${16} /><span>${showVideo ? "Masquer la vidéo" : "Vidéo"}</span></button>`
         : html`<a class="btn sm on-band-ghost video-btn" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} /><span>Vidéo</span></a>`
-      : null;
+      : m.videoKind === "discord"
+        ? html`<span class="video-chip video-btn" title=${m.videoNote || "Fichier vidéo enregistré sur Discord"}><${Icon} name="play" size=${15} /><span>Vidéo sur Discord</span></span>`
+        : null;
     const onSwitch = (id) => go({ view: "entry", matchId, playerId: id });
 
     return html`<div class=${cx("entry", showVideo && "with-video")}>

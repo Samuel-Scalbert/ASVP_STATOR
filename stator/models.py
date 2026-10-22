@@ -47,6 +47,9 @@ class Match(db.Model):
     venue: Mapped[str] = mapped_column(String(10), default="")  # "dom", "ext" ou ""
     competition: Mapped[str] = mapped_column(String(120), default="")
     video_url: Mapped[str] = mapped_column(String(300), default="")  # lien YouTube du match
+    video_kind: Mapped[str] = mapped_column(String(10), default="")  # "" (pas de vidéo), "lien" ou "discord" (fichier sur Discord)
+    video_note: Mapped[str] = mapped_column(String(200), default="")  # nom du fichier sur Discord (facultatif)
+    closed: Mapped[bool] = mapped_column(Boolean, default=False)  # saisie close : les points non notés ne sont pas comptabilisés
     squad: Mapped[str] = mapped_column(Text, default="")  # joueurs du match : ids séparés par des virgules (vide = tout l'effectif)
     no_data: Mapped[bool] = mapped_column(Boolean, default=False)  # « NO VIDEO / NO DATA » : score seulement, pas de fiches
     # Résultat en sets, utilisé seulement quand le détail des sets n'est pas connu.
