@@ -28,6 +28,7 @@
   --band-wash: rgba(255, 255, 255, 0.09);
   --cta: #f39325;
   --cta-ink: #1f1000;
+  --cta-soft: rgba(243, 147, 37, 0.16);
   --focus: #2a78d6;
   /* Résultats d’un geste, du meilleur (1) au pire (4) : bleu ↔ rouge, sûr pour les daltoniens. */
   --o1: #1c5cab; --o2: #86b6ef; --o3: #f0a39a; --o4: #c8322f;
@@ -578,6 +579,26 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .toc-link { border: 0; background: none; border-radius: 10px; padding: 7px 10px 7px 6px; font-size: 14px; }
   .tuto-body section { scroll-margin-top: 24px; }
 }
+
+/* ---------- Fiche Excel pour le coach ---------- */
+.export-card { border-style: dashed; border-color: var(--line-2); }
+.detail-actions { justify-content: space-between; padding-bottom: 6px; }
+.sheet-map { margin: 0; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.sheet-map svg { width: 100%; height: auto; display: block; }
+.sm-sheet { fill: var(--surface); stroke: var(--line-2); stroke-width: 1; }
+.sm-head { fill: var(--surface-2); stroke: var(--line-2); stroke-width: 0.6; }
+.sm-lbl { fill: var(--surface-2); }
+.sm-calc { fill: var(--surface-2); stroke: var(--line-2); stroke-dasharray: 3 2; stroke-width: 0.6; }
+.sm-a { fill: var(--o1-bg); stroke: var(--o1); stroke-width: 1.4; }
+.sm-b { fill: var(--cta-soft); stroke: var(--cta); stroke-width: 1.4; }
+.sm-t { fill: var(--ink-2); font-size: 7.5px; font-family: var(--font-body); }
+.sm-big { fill: var(--ink); font-size: 10px; font-weight: 700; font-family: var(--font-body); }
+.steps-coach { gap: 12px; }
+.steps-coach code, .tuto-body code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.92em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
+.paste-ways { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px; }
+.paste-box { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 12px; background: var(--surface-2); font-size: 14px; }
+.warn-box { display: flex; flex-direction: column; gap: 6px; border-left: 4px solid var(--o4); background: var(--o4-bg); border-radius: 0 10px 10px 0; padding: 10px 14px; }
+@media (min-width: 720px) { .paste-ways { grid-template-columns: 1fr 1fr; } }
 
 /* ---------- Mode sombre, vidéo, sélecteur de joueur, tableaux par set ---------- */
 .theme-toggle { display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--band-line); background: var(--band-wash); color: var(--band-ink); border-radius: 12px; padding: 9px 12px; font-weight: 600; font-size: 14px; }

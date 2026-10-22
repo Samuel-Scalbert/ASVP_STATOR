@@ -75,6 +75,15 @@
     const tab = tabRaw === "bilan" || (Number.isInteger(tabRaw) && tabRaw >= 1 && tabRaw <= nSets) ? tabRaw : 1;
     const [undo, setUndo] = useState([]);
     const [tipOff, setTipOff] = useState(() => lsGet("asvp-stator-tip2", false));
+    const [exporting, setExporting] = useState(false);
+    const exportSheet = async () => {
+      setExporting(true);
+      try {
+        const res = await root.StatorIO.exportPlayer(m, q.name(playerId), docRef.current);
+        U.toast(res === "saved" ? "Fiche Excel prête." : res === "declined" ? "Téléchargement annulé." : "Téléchargement impossible dans cette vue.");
+      } catch (e) { U.toast("Impossible de préparer le fichier : vérifie ta connexion."); }
+      setExporting(false);
+    };
 
     // Si la fiche arrive de la base après l’ouverture et qu’on n’a encore rien touché, on la reprend.
     useEffect(() => {
@@ -207,6 +216,14 @@
             <h3 class="h-sec">Bilan collectif</h3>
             <${TextField} id="b-cp" label="Les +" hint="Ce que l’équipe a bien fait" value=${doc.bilan.cp || ""} onInput=${(v) => setBilan("cp", v)} placeholder="Ex. : nos services les ont mis en difficulté" />
             <${TextField} id="b-cm" label="Les −" hint="Ce que l’équipe doit corriger" value=${doc.bilan.cm || ""} onInput=${(v) => setBilan("cm", v)} placeholder="Ex. : réception brouillonne sur les séries adverses" />
+          </section>
+          <section class="card export-card">
+            <h3 class="h-sec">Excel du coach</h3>
+            <p class="muted small">Le coach remplit encore son fichier ? Télécharge la fiche de ${q.name(playerId)} au même format, puis colle-la dans son onglet en deux copier-coller.</p>
+            <div class="row-btns">
+              <button class="btn dark" onClick=${exportSheet} disabled=${exporting}><${Icon} name="down" size=${18} />${exporting ? "Préparation…" : "Télécharger la fiche Excel"}</button>
+              <button class="btn ghost" onClick=${() => go({ view: "tuto", anchor: "coach" })}>Comment l’ajouter ?</button>
+            </div>
           </section>
           </div>
           </div>

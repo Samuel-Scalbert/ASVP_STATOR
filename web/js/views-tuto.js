@@ -1,7 +1,7 @@
 /* ASVP Stator — tuto : chaque stat, comment la compter et comment elle est calculée. */
 (function (root) {
   "use strict";
-  const { html, useState } = root.htmPreact;
+  const { html, useState, useEffect } = root.htmPreact;
   const C = root.StatorCore;
   const { store } = root.StatorStore;
   const U = root.StatorUI;
@@ -38,6 +38,7 @@
     ["calculs", "Comment les chiffres sont calculés"],
     ["ecrans", "Lire les écrans"],
     ["excel", "Où retrouver l’Excel"],
+    ["coach", "Ajouter sa fiche à l’Excel du coach"],
     ["faq", "Questions fréquentes"],
   ];
   const goTo = (id) => {
@@ -83,7 +84,35 @@
     </div>`;
   }
 
-  function Tuto() {
+  /* Schéma de l’onglet d’un joueur : les deux blocs à copier (stats E3:I30, bilans M32:M41). */
+  function SheetMap() {
+    const cols = [["B", 22, 40], ["C", 62, 30], ["D", 92, 20], ["E", 112, 22], ["F", 134, 22], ["G", 156, 22], ["H", 178, 22], ["I", 200, 22],
+      ["J", 222, 10], ["K", 232, 30], ["L", 262, 20], ["M", 282, 74]];
+    const y = (row) => 18 + (row - 2) * 4.4;
+    return html`<figure class="sheet-map">
+      <svg viewBox="0 0 360 206" role="img" aria-label="Onglet du joueur : le bloc des stats va de E3 à I30, le bloc des bilans de M32 à M41">
+        <rect x="22" y="18" width="334" height=${y(42) - 18} class="sm-sheet" />
+        ${cols.map(([c, x, w]) => html`<g key=${c}><rect x=${x} y="4" width=${w} height="14" class="sm-head" /><text x=${x + w / 2} y="14" text-anchor="middle" class="sm-t">${c}</text></g>`)}
+        <rect x="22" y=${y(3)} width="90" height=${y(42) - y(3)} class="sm-lbl" />
+        <rect x="232" y=${y(3)} width="50" height=${y(31) - y(3)} class="sm-lbl" />
+        <rect x="112" y=${y(3)} width="110" height=${y(31) - y(3)} class="sm-a" />
+        <text x="167" y=${y(15)} text-anchor="middle" class="sm-big">1. Stats</text>
+        <text x="167" y=${y(19)} text-anchor="middle" class="sm-t">E3 → I30</text>
+        <rect x="282" y=${y(32)} width="74" height=${y(42) - y(32)} class="sm-b" />
+        <text x="319" y=${y(36)} text-anchor="middle" class="sm-big">2. Bilans</text>
+        <text x="319" y=${y(39.5)} text-anchor="middle" class="sm-t">M32 → M41</text>
+        <rect x="112" y=${y(32)} width="110" height=${y(42) - y(32)} class="sm-calc" />
+        <text x="167" y=${y(37.5)} text-anchor="middle" class="sm-t">totaux (formules)</text>
+        <text x="67" y=${y(22)} text-anchor="middle" class="sm-t">libellés</text>
+        <text x="257" y=${y(17)} text-anchor="middle" class="sm-t">légende</text>
+        ${[[3, "3"], [30, "30"], [32, "32"], [41, "41"]].map(([r, t]) => html`<text key=${t} x="18" y=${y(r) + 3.5} text-anchor="end" class="sm-t">${t}</text>`)}
+      </svg>
+      <figcaption class="muted small">L’onglet d’un joueur, identique dans la fiche téléchargée et dans l’Excel du coach. Seuls les deux blocs colorés sont à copier.</figcaption>
+    </figure>`;
+  }
+
+  function Tuto({ anchor }) {
+    useEffect(() => { if (anchor) { const t = setTimeout(() => goTo(anchor), 80); return () => clearTimeout(t); } return undefined; }, [anchor]);
     const plus = scoring(1), minus = scoring(-1);
     const P = plus.reduce((t, x) => t + x.n, 0), F = minus.reduce((t, x) => t + x.n, 0);
     const srv = { rel: ex("service", "incisif"), att: ex("service", "cadeau") };
@@ -217,15 +246,43 @@
             <p class="muted small">Deux calculs diffèrent volontairement de l’ancien fichier : les totaux d’équipe comptent tous les joueurs (l’Excel en oubliait certains), et le taux d’un match est calculé sur tous les gestes plutôt qu’en moyenne des sets.</p>
           </section>
 
+          <section class="card" id="tuto-coach">
+            <h2 class="h-sec"><span class="sec-n">7</span>Ajouter sa fiche à l’Excel du coach</h2>
+            <p>Tant que le coach garde son fichier, chaque joueur peut y recopier sa fiche de l’app en <b>deux copier-coller</b>. La fiche téléchargée reprend exactement l’onglet du joueur chez le coach : mêmes lignes, mêmes colonnes, mêmes formules. Il suffit de coller au même endroit.</p>
+            <${SheetMap} />
+            <ol class="howto steps-coach">
+              <li><b>Télécharge la fiche.</b> À la fin de la saisie, onglet <i>Bilan</i> › « Télécharger la fiche Excel ». Le coach peut aussi la télécharger depuis <i>Match › Joueurs</i>, en touchant le nom du joueur. Le fichier s’appelle par exemple « ASVP - Dunois - Samuel.xlsx ».</li>
+              <li><b>Ouvre les deux fichiers</b> : la fiche téléchargée et l’Excel du coach, sur Excel ou sur Google Sheets.</li>
+              <li><b>Copie les stats.</b> Dans la fiche, sélectionne les cases <code>E3</code> à <code>I30</code>. Le plus simple : tape <code>E3:I30</code> dans la zone Nom (en haut à gauche, à côté de la barre de formule), puis Entrée. Copie avec Ctrl+C (Cmd+C sur Mac).</li>
+              <li><b>Colle chez le coach, sans la mise en forme.</b> Ouvre l’onglet à ton nom, clique sur la case <code>E3</code>, puis :
+                <div class="paste-ways">
+                  <div class="paste-box"><b>Excel</b><span>Clic droit › Collage spécial… › coche « Formules » › OK.</span></div>
+                  <div class="paste-box"><b>Google Sheets</b><span>Clic droit › Collage spécial › « Formule uniquement ».</span></div>
+                </div>
+              </li>
+              <li><b>Fais pareil pour les bilans.</b> Copie <code>M32:M41</code> dans la fiche, puis colle de la même façon sur la case <code>M32</code> de ton onglet.</li>
+              <li><b>Vérifie.</b> Dans les onglets <i>BILAN</i> et <i>STATS</i> du coach, ta ligne se remplit toute seule : ses formules lisent ton onglet.</li>
+            </ol>
+            <div class="warn-box">
+              <b>À éviter</b>
+              <ul class="bullets">
+                <li><b>Un Ctrl+V simple</b> : il remplacerait les couleurs et les bordures du fichier du coach. Utilise toujours le collage spécial.</li>
+                <li><b>Coller ailleurs qu’en E3 et M32</b> : les chiffres seraient décalés d’une ligne ou d’un set.</li>
+                <li><b>Renommer ou supprimer ton onglet</b> chez le coach : les feuilles BILAN et STATS le retrouvent par son nom.</li>
+              </ul>
+            </div>
+            <p class="muted small">Sur Google Sheets, le plus simple est d’ouvrir aussi la fiche téléchargée dans Google Sheets (Fichier › Importer), puis de copier-coller d’un onglet du navigateur à l’autre. Le mode d’emploi est aussi rappelé dans la fiche elle-même (onglet « Mode d’emploi »). Enfin, le coach peut se passer de ces copier-coller : le bouton « Excel » de la page du match produit en un clic le fichier complet de l’équipe.</p>
+          </section>
+
           <section class="card" id="tuto-faq">
-            <h2 class="h-sec"><span class="sec-n">7</span>Questions fréquentes</h2>
+            <h2 class="h-sec"><span class="sec-n">8</span>Questions fréquentes</h2>
             <dl class="faq">
               <dt>Un joueur n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
               <dt>J’ai touché la mauvaise case.</dt><dd>Le − dans le coin de la case retire 1 ; « Annuler » en bas efface la dernière touche.</dd>
               <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : sur PC, la vidéo s’affiche à côté des cases. Avec « Joueur suivant », une seule personne saisit toute l’équipe en revoyant le match.</dd>
               <dt>Un joueur ne sait pas s’il doit compter une action.</dt><dd>« Comment compter », à côté de chaque geste, donne la définition de chaque résultat.</dd>
               <dt>Où vont les données ?</dt><dd>${store.mode === "local" ? "Sur cet appareil uniquement (mode hors ligne). Exporte l’Excel pour les transmettre." : "Dans la base de l’équipe : tout le monde voit la même chose, sans fichier à s’échanger."}</dd>
-              <dt>Le coach veut toujours son fichier Excel.</dt><dd>Bouton « Excel » sur la page du match : il produit le fichier au format habituel.</dd>
+              <dt>Le coach veut toujours son fichier Excel.</dt><dd>Bouton « Excel » sur la page du match : il produit le fichier au format habituel. Ou chaque joueur colle sa fiche dans le fichier du coach (partie 7).</dd>
             </dl>
           </section>
         </div>

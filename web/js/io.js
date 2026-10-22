@@ -29,7 +29,11 @@
         const raw = sh.cells[ref];
         if (raw === "" || raw == null) return;
         let cell;
-        if (typeof raw === "object") cell = { t: "n", v: raw.v, z: raw.z };
+        if (typeof raw === "object") {
+          cell = { t: typeof raw.v === "number" ? "n" : "s", v: raw.v };
+          if (raw.z) cell.z = raw.z;
+          if (raw.f) cell.f = raw.f; // formule recopiée de l’Excel du coach, avec sa valeur déjà calculée
+        }
         else if (typeof raw === "number") cell = { t: "n", v: raw };
         else cell = { t: "s", v: String(raw) };
         ws[ref] = cell;
@@ -72,6 +76,13 @@
     const buf = X.write(wb, { bookType: "xlsx", type: "array" });
     return saveFile("ASVP - " + safeName(m.opponent || "match") + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
   }
+  /* La fiche d’un joueur seul, au format de son onglet dans l’Excel du coach. */
+  async function exportPlayer(m, name, doc) {
+    const X = await loadXLSX();
+    const wb = specToWorkbook(X, C.playerExportSpec(name, doc, m));
+    const buf = X.write(wb, { bookType: "xlsx", type: "array" });
+    return saveFile("ASVP - " + safeName(m.opponent || "match") + " - " + safeName(name) + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
+  }
   async function exportSeason() {
     const X = await loadXLSX();
     const entries = q.matchList().slice().reverse().map((m) => ({ match: m, players: q.playersOf(m.id) }));
@@ -92,5 +103,5 @@
     return C.parseWorkbookData(wb.SheetNames, cell, file.name);
   }
 
-  root.StatorIO = { loadXLSX, exportMatch, exportSeason, readWorkbookFile };
+  root.StatorIO = { loadXLSX, exportMatch, exportPlayer, exportSeason, readWorkbookFile };
 })(window);

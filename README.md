@@ -4,7 +4,8 @@ Application de stats de match de l'ASVP Alsa Team (volley). Elle remplace le fic
 « ASVP - <adversaire>.xlsx » rempli après chaque match : on compte les actions de chaque joueur
 set par set (en revoyant la vidéo YouTube du match si besoin), chacun écrit son bilan, et
 l'équipe retrouve les stats du match et de la saison. Le bouton « Excel » d'un match produit
-toujours le fichier au format habituel.
+toujours le fichier au format habituel, et chaque joueur peut télécharger sa fiche au format de
+son onglet pour la coller dans l'Excel du coach (marche à suivre dans le Tuto de l'app).
 
 ## Aperçu
 

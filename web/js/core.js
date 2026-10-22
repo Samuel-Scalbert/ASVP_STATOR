@@ -241,6 +241,27 @@
     "C9:D9", "C10:D10", "B15:D15", "C27:D27", "C28:D28", "C29:D29", "B30:D30", "C13:D13", "C14:D14", "C16:C18",
     "C19:C21", "C22:D22", "B23:D23", "C24:C26", "L32:L34", "L35:L36", "K37:K41", "L37:L39", "M37:M39", "L40:L41", "M40:M41"];
   const PCT = (r) => (r == null ? "-" : { v: r, z: "0%" });
+  /* Formules des feuilles joueurs de l’Excel du coach (X = colonne du set), recopiées à l’identique :
+     une fiche collée dans son fichier garde des taux et des totaux qui se recalculent. */
+  const XL_FORMULAS = {
+    7: 'IF(SUM(X3:X6)=0,"-",X3/SUM(X3:X6))',
+    11: 'IF((X8+X9+X10)=0,"-",X8/(X8+X9+X10))',
+    15: 'IF((X12+X13+X14)=0,"-",X12/(X12+X13+X14))',
+    23: 'IF((SUM(X16:X22))=0,"-",SUM(X16:X18)/(SUM(X16:X22)))',
+    30: 'IF((SUM(X24:X29))=0,"-",SUM(X24:X26)/(SUM(X24:X29)))',
+    33: "SUM(X24:X26)", 34: "X3", 35: "X8", 36: "SUM(X33:X35)",
+    37: "X29", 38: "X6", 39: "X14", 40: "X22", 41: "SUM(X37:X40)",
+  };
+  const withFormula = (value, row, col) => {
+    const f = XL_FORMULAS[row];
+    if (!f) return value;
+    const cell = typeof value === "object" && value ? Object.assign({}, value) : { v: value };
+    cell.f = f.replace(/X(?=\d)/g, col);
+    return cell;
+  };
+  function xlSheetName(name) {
+    return String(name).replace(/[\\/?*\[\]:]/g, " ").slice(0, 31).trim() || "Joueur";
+  }
 
   function playerSheetSpec(name, doc) {
     const c = Object.assign({ B2: name, E2: "SET 1", F2: "SET 2", G2: "SET 3", H2: "SET 4", I2: "SET 5", E32: "SET 1", F32: "SET 2", G32: "SET 3", H32: "SET 4", I32: "SET 5" }, XL_LABELS);
@@ -249,16 +270,48 @@
       const col = SET_COLS[i];
       SKILLS.forEach((s) => {
         s.fields.forEach((f) => { const v = setVal(set, s.key, f.k); if (v && f.row) c[col + f.row] = v; });
-        if (s.rateRow) c[col + s.rateRow] = PCT(sumSkill([set], s.key).rate);
+        if (s.rateRow) c[col + s.rateRow] = withFormula(PCT(sumSkill([set], s.key).rate), s.rateRow, col);
       });
       const sl = scoreLine([set]);
-      c[col + 33] = sl.pts.attaque; c[col + 34] = sl.pts.service; c[col + 35] = sl.pts.bloc; c[col + 36] = sl.P;
-      c[col + 37] = sl.flt.attaque; c[col + 38] = sl.flt.service; c[col + 39] = sl.flt.reception; c[col + 40] = sl.flt.passe; c[col + 41] = sl.F;
+      [[33, sl.pts.attaque], [34, sl.pts.service], [35, sl.pts.bloc], [36, sl.P],
+        [37, sl.flt.attaque], [38, sl.flt.service], [39, sl.flt.reception], [40, sl.flt.passe], [41, sl.F]]
+        .forEach(([row, v]) => { c[col + row] = withFormula(v, row, col); });
     });
     const b = (doc && doc.bilan) || {};
     c.M32 = b.pp || ""; c.M35 = b.pm || ""; c.M37 = b.cp || ""; c.M40 = b.cm || "";
     return { name, cells: c, merges: XL_PLAYER_MERGES,
       cols: [5, 22, 12, 12, 10, 10, 10, 10, 10, 4, 18, 12, 90] };
+  }
+
+  /* Fiche d’un seul joueur, à coller dans l’Excel du coach : sa feuille (même disposition) + un mode d’emploi. */
+  function playerExportSpec(name, doc, match) {
+    const tab = xlSheetName(name);
+    const sheet = playerSheetSpec(tab, doc);
+    Object.assign(sheet.cells, {
+      B44: "À COLLER DANS L’EXCEL DU COACH, ONGLET « " + tab + " »",
+      B45: "1) Stats : sélectionner E3:I30, copier, puis chez le coach cliquer sur E3 › Collage spécial › Formules.",
+      B46: "2) Bilans : sélectionner M32:M41, copier, puis chez le coach cliquer sur M32 › Collage spécial › Formules.",
+      B47: "Détails dans l’onglet « Mode d'emploi » et dans le Tuto de l’app.",
+    });
+    const when = match && match.date ? " du " + match.date.split("-").reverse().join("/") : "";
+    const guide = {
+      name: "Mode d'emploi",
+      cols: [4, 120],
+      cells: {
+        B1: "Ajouter la fiche de " + name + " à l’Excel du coach",
+        B2: "Match ASVP – " + ((match && match.opponent) || "") + when,
+        B4: "1. Ouvre ce fichier et l’Excel du coach (sur Excel ou sur Google Sheets).",
+        B5: "2. Ici, dans l’onglet « " + tab + " », sélectionne les cases E3 à I30 (tape E3:I30 dans la zone Nom, en haut à gauche, puis Entrée), puis copie (Ctrl+C).",
+        B6: "3. Dans l’Excel du coach, ouvre l’onglet « " + tab + " » et clique sur la case E3.",
+        B7: "4. Colle sans la mise en forme. Excel : clic droit › Collage spécial › Formules › OK. Google Sheets : clic droit › Collage spécial › Formule uniquement.",
+        B8: "5. Recommence pour les bilans : copie les cases M32 à M41 ici, puis colle-les de la même façon en M32 dans l’onglet du coach.",
+        B9: "6. Vérifie les onglets BILAN et STATS du coach : la ligne de " + name + " s’est remplie toute seule.",
+        B11: "À éviter : un Ctrl+V simple, qui remplacerait les couleurs et les bordures du fichier du coach.",
+        B12: "À éviter : renommer ou supprimer l’onglet du joueur chez le coach. Les feuilles BILAN et STATS le retrouvent par son nom.",
+        B13: "Si l’onglet du coach contenait déjà des chiffres pour ce match, le collage les remplace.",
+      },
+    };
+    return [sheet, guide];
   }
 
   /* players : [{ id, name, doc }] dans l’ordre de l’effectif. */
@@ -349,7 +402,7 @@
     ];
     const used = new Set(sheets.map((s) => s.name.toLowerCase()));
     players.forEach((p) => {
-      let n = String(p.name).replace(/[\\/?*\[\]:]/g, " ").slice(0, 31).trim() || "Joueur";
+      let n = xlSheetName(p.name);
       let k = 2;
       while (used.has(n.toLowerCase())) n = n.slice(0, 28) + " " + k++;
       used.add(n.toLowerCase());
@@ -408,7 +461,7 @@
     MAX_SETS, SET_COLS, setReferential,
     norm, slug, uid, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
     opponentLine, matchSets, matchResult, matchSetCount, seasonOf,
-    parseWorkbookData, playerSheetSpec, matchWorkbookSpec, seasonWorkbookSpec,
+    parseWorkbookData, playerSheetSpec, playerExportSpec, matchWorkbookSpec, seasonWorkbookSpec,
   };
   Object.defineProperties(api, {
     SKILLS: { get: () => SKILLS }, SKILL: { get: () => SKILL }, LEVELS: { get: () => LEVELS },

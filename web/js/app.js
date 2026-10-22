@@ -119,7 +119,7 @@
     } else if (view === "match") {
       body = html`<${M.MatchView} matchId=${route.matchId} me=${meValid} go=${go} openSheet=${openSheet} sub=${sub} setSub=${setSub} />`;
     } else if (view === "season") body = html`<${S.Season} go=${go} />`;
-    else if (view === "tuto" || view === "guide") body = html`<${root.StatorTuto.Tuto} />`;
+    else if (view === "tuto" || view === "guide") body = html`<${root.StatorTuto.Tuto} anchor=${route.anchor} />`;
     else if (view === "team") body = html`<${S.Team} go=${go} openSheet=${openSheet} me=${meValid} />`;
     else body = html`<${M.Home} me=${meValid} go=${go} openSheet=${openSheet} />`;
 

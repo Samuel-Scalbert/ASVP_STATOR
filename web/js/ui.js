@@ -136,9 +136,11 @@
       ${order.filter((o) => r.byO[o] > 0).map((o) => html`<span key=${o} class=${"seg l" + s.outcomes[o].lvl} style=${{ flexGrow: r.byO[o] }} title=${s.outcomes[o].label + " : " + r.byO[o]}></span>`)}
     </div>`;
   }
+  /* Pluriel d’un libellé de résultat : « 3 erreurs », « 2 cadeaux ». */
+  const plur = (w, n) => (n > 1 ? (/eau$/.test(w) ? w + "x" : /s$/.test(w) ? w : w + "s") : w);
   function distText(skill, r) {
     const s = C.SKILL[skill];
-    return Object.keys(s.outcomes).filter((o) => r.byO[o] > 0).map((o) => r.byO[o] + " " + s.outcomes[o].label.toLowerCase()).join(" · ");
+    return Object.keys(s.outcomes).filter((o) => r.byO[o] > 0).map((o) => r.byO[o] + " " + plur(s.outcomes[o].label.toLowerCase(), r.byO[o])).join(" · ");
   }
   function LevelLegend() {
     return html`<ul class="legend" aria-label="Couleurs des résultats">

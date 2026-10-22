@@ -459,10 +459,23 @@
     </div>`;
   }
   function PlayerDetail({ p, m }) {
+    const [busy, setBusy] = useState(false);
     const doc = q.doc(m.id, p.id);
     const sets = C.setsArray(doc);
     const b = (doc && doc.bilan) || {};
+    const download = async () => {
+      setBusy(true);
+      try {
+        const res = await root.StatorIO.exportPlayer(m, p.name, doc);
+        U.toast(res === "saved" ? "Fiche Excel prête." : res === "declined" ? "Téléchargement annulé." : "Téléchargement impossible dans cette vue.");
+      } catch (e) { U.toast("Impossible de préparer le fichier : vérifie ta connexion."); }
+      setBusy(false);
+    };
     return html`<div>
+      <div class="row-btns detail-actions">
+        <button class="btn ghost sm" onClick=${download} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Fiche Excel de " + p.name}</button>
+        <span class="muted small">À coller dans son onglet de l’Excel du coach (voir le Tuto).</span>
+      </div>
       <${Recap} sets=${sets} />
       ${C.hasBilan(doc) && html`<section class="perso">
         ${b.pp && html`<p><span class="tag plus">+</span>${b.pp}</p>`}${b.pm && html`<p><span class="tag minus">−</span>${b.pm}</p>`}
