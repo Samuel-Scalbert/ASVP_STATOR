@@ -104,6 +104,15 @@
       docRef.current = next;
       setDoc(next);
       api.saveStats(next);
+      if (C.isFilled(next)) joinSquad();
+    }
+    // Fiche d’un joueur oublié dans la liste du match : on l’y ajoute, sinon elle ne compterait pas.
+    function joinSquad() {
+      const squad = q.squadOf(matchId);
+      if (!squad || squad.indexOf(playerId) >= 0) return;
+      const order = q.roster().map((p) => p.id);
+      const next = squad.concat([playerId]).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      api.saveMatch(Object.assign({}, store.matches[matchId] || m, { squad: next, updatedAt: new Date().toISOString() }));
     }
     function change(setNo, sk, k, delta) {
       if (readOnly) return false;

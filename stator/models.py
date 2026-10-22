@@ -44,6 +44,7 @@ class Match(db.Model):
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     opponent: Mapped[str] = mapped_column(String(120))
     match_date: Mapped[date | None] = mapped_column(Date)
+    match_time: Mapped[str] = mapped_column(String(5), default="")  # heure du match « 20:30 » (facultative)
     venue: Mapped[str] = mapped_column(String(10), default="")  # "dom", "ext" ou ""
     competition: Mapped[str] = mapped_column(String(120), default="")
     video_url: Mapped[str] = mapped_column(String(300), default="")  # lien YouTube du match

@@ -85,7 +85,7 @@
   }
   async function exportSeason() {
     const X = await loadXLSX();
-    const entries = q.matchList().slice().reverse().map((m) => ({ match: m, players: q.playersOf(m.id) }));
+    const entries = q.played().slice().reverse().map((m) => ({ match: m, players: q.playersOf(m.id) }));
     const wb = specToWorkbook(X, C.seasonWorkbookSpec(entries, q.roster()));
     const buf = X.write(wb, { bookType: "xlsx", type: "array" });
     const season = (store.config && store.config.season) || "saison";

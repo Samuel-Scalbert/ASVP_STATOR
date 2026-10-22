@@ -13,6 +13,7 @@ from .referentiel import field_ids
 ID_RE = re.compile(r"^[A-Za-z0-9_\-.~:@+]{1,170}$")
 VENUES = {"", "dom", "ext"}
 VIDEO_KINDS = {"", "lien", "discord"}
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 SOURCES = {"app", "excel"}
 
 
@@ -69,6 +70,7 @@ def match_doc(m: Match) -> dict:
     return {
         "id": m.id, "opponent": m.opponent,
         "date": m.match_date.isoformat() if m.match_date else "",
+        "time": m.match_time or "",
         "venue": m.venue or "", "competition": m.competition or "", "video": m.video_url or "",
         "squad": [p for p in (m.squad or "").split(",") if p],
         "noData": bool(m.no_data),
@@ -164,6 +166,11 @@ def save_match(match_id: str, doc: dict) -> Match:
     m = db.session.get(Match, match_id) or Match(id=match_id, created_at=utcnow())
     m.opponent = opponent[:120]
     m.match_date = _parse_date(doc.get("date"))
+    if "time" in doc:  # une page d'avant l'heure n'envoie pas ce champ : on garde l'heure déjà enregistrée
+        time = str(doc.get("time") or "").strip()
+        if time and not TIME_RE.match(time):
+            raise InvalidData("Heure du match invalide (format 20:30).")
+        m.match_time = time
     m.venue = venue
     m.competition = str(doc.get("competition") or "")[:120]
     video = str(doc.get("video") or "").strip()

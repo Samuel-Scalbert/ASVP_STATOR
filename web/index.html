@@ -181,14 +181,49 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .hero-state b { color: var(--band-ink); }
 .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hero-actions .btn { flex: 1 1 160px; }
-.match-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.match-row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 12px 14px; color: var(--ink); }
-.match-row:hover { border-color: var(--line-2); }
-.mr-date { font-family: var(--font-display); font-weight: 700; text-transform: uppercase; font-size: 15px; width: 54px; flex: none; color: var(--ink-2); line-height: 1.1; }
-.mr-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.mr-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mr-main small { color: var(--muted); }
-.mr-comp { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Accueil : le dernier match, le calendrier (à droite sur PC, juste après sur téléphone), puis les autres matchs empilés. */
+.home-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.hl-first, .hl-rest { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.home-layout .hero { border: 1px solid var(--band-line); }
+.hero-top { align-items: center; }
+@media (min-width: 1100px) {
+  .home-layout { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; gap: 16px 24px; align-items: start; }
+  .hl-first { grid-column: 1; grid-row: 1; }
+  .hl-rest { grid-column: 1; grid-row: 2; }
+  .hl-cal { grid-column: 2; grid-row: 1 / span 2; position: sticky; top: 28px; }
+}
+.cal { gap: 12px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.cal-nav { display: flex; align-items: center; gap: 2px; }
+.cal-month { min-width: 118px; text-align: center; font-weight: 700; font-size: 14px; }
+.cal-month::first-letter { text-transform: uppercase; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-wd { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); }
+.cal-day { aspect-ratio: 1; min-height: 36px; display: grid; place-items: center; border-radius: 9px; border: 1px solid transparent; background: none; font-weight: 600; font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; padding: 0; }
+.cal-day:not(.blank):not(:disabled):hover { background: var(--surface-2); border-color: var(--line); }
+.cal-day.past { color: var(--muted); }
+.cal-day.today { box-shadow: inset 0 0 0 2px var(--accent); color: var(--ink); font-weight: 800; }
+.cal-day.played, .cal-day.played:hover { background: var(--o1-bg); color: var(--o1); font-weight: 800; border-color: transparent; }
+.cal-day.up, .cal-day.up:not(:disabled):hover { background: var(--cta); color: var(--cta-ink); font-weight: 800; border-color: transparent; }
+.cal-day:disabled { opacity: 1; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.cal-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.cal-legend .lg-played { background: var(--o1-bg); box-shadow: inset 0 0 0 1px var(--o1); }
+.cal-legend .lg-up { background: var(--cta); }
+.cal-legend .lg-today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-next { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.cal-next .h-sub { margin: 0; }
+.next-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.next-row { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; color: var(--ink); }
+.next-row:hover { border-color: var(--line-2); }
+.next-date { width: 40px; flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1; font-family: var(--font-display); text-transform: uppercase; }
+.next-date b { font-size: 24px; font-weight: 800; }
+.next-date small { font-size: 12px; font-weight: 700; color: var(--muted); }
+.next-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.next-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next-main small { color: var(--muted); }
+.next-main small::first-letter { text-transform: uppercase; }
+.next-in { flex: none; font-size: 12px; font-weight: 800; border-radius: 999px; padding: 2px 9px; background: var(--cta); color: var(--cta-ink); white-space: nowrap; }
 .res { font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
 .res.win { background: var(--good-bg); color: var(--good-ink); }
 .res.loss { background: var(--bad-bg); color: var(--bad-ink); }
@@ -465,7 +500,7 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .board-score { font-size: 72px; }
 }
 /* ---------- Grilles (empilées sur téléphone, en colonnes sur PC) ---------- */
-.home-grid, .home-main, .summary-grid, .team-grid, .col, .skills-grid, .skills-col, .bilan-grid, .bilan-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.summary-grid, .team-grid, .col, .skills-grid, .skills-col, .bilan-grid, .bilan-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .guide-skills { display: grid; gap: 0 32px; }
 .logo { display: block; height: auto; }
 .topbar .logo { width: 30px; }
@@ -516,10 +551,6 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .bilan-grid, .summary-grid, .team-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
   .guide-skills { grid-template-columns: 1fr 1fr; }
   .hero { padding: 24px 24px 22px; }
-}
-@media (min-width: 1100px) {
-  .home-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
-  .match-block .block-head { min-height: 44px; }
 }
 @media (min-width: 1180px) {
   .skills-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }

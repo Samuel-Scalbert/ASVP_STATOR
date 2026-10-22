@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT_DIR / "web"
 # Niveau de l'API : à augmenter (ici et dans web/js/store.js) quand la page envoie ou attend de nouvelles
 # données. Une page plus récente que le serveur se met alors en lecture seule au lieu de perdre des données.
-API_LEVEL = 4
+API_LEVEL = 5
 
 
 def version_info() -> dict:
@@ -72,6 +72,8 @@ def _upgrade_schema() -> None:
             conn.execute(text("ALTER TABLE matches ADD COLUMN video_note VARCHAR(200) DEFAULT ''"))
         if "closed" not in columns:
             conn.execute(text("ALTER TABLE matches ADD COLUMN closed BOOLEAN DEFAULT 0"))
+        if "match_time" not in columns:
+            conn.execute(text("ALTER TABLE matches ADD COLUMN match_time VARCHAR(5) DEFAULT ''"))
         sheet_columns = {c["name"] for c in inspect(conn).get_columns("stat_sheets")}
         if "source" not in sheet_columns:
             conn.execute(text("ALTER TABLE stat_sheets ADD COLUMN source VARCHAR(10) DEFAULT 'app'"))

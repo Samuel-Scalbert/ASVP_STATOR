@@ -12,7 +12,7 @@
     const [who, setWho] = useState("team");
     const [sort, setSort] = useState({ k: "P", dir: -1 });
     const [busy, setBusy] = useState(false);
-    const matches = q.matchList().slice().reverse();
+    const matches = q.played().slice().reverse();
     const withData = matches.filter((m) => !m.noData && q.statsOf(m.id).some((d) => C.isFilled(d)));
     const res = matches.map((m) => C.matchResult(m)).filter(Boolean);
     const wins = res.filter((r) => r.a > r.o).length, losses = res.filter((r) => r.a < r.o).length;

@@ -20,6 +20,7 @@
     } catch (e) { return d; }
   }
   const shortDate = (d) => (d ? fmtDate(d, { day: "numeric", month: "short" }) : "s.d.");
+  const fmtTime = (t) => (t ? t.replace(":", "h") : "");
 
   /* Lien YouTube (youtu.be, watch?v=, live/, shorts/, embed/) -> adresse du lecteur intégré, ou null. */
   function youtubeEmbed(url) {
@@ -296,5 +297,5 @@
     </span>`;
   }
 
-  root.StatorUI = { ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
+  root.StatorUI = { ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, fmtTime, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
 })(window);

@@ -133,8 +133,19 @@
       else if (sheet.type === "who") sheetEl = html`<${Sheet} title="Qui es-tu ?" onClose=${close}>
         <p class="muted">Choisis ton nom : il reste mémorisé sur cet appareil. Tu peux aussi remplir la fiche d’un coéquipier.</p>
         <${M.WhoGrid} me=${meValid} onPick=${(id) => { setMe(id); close(); if (sheet.then) { setRoute(sheet.then); root.scrollTo(0, 0); } }} /><//>`;
-      else if (sheet.type === "match-form") sheetEl = html`<${Sheet} title=${sheet.m ? "Modifier le match" : "Nouveau match"} onClose=${close}>
-        <${M.MatchForm} m=${sheet.m} onDone=${(m, created) => { close(); U.toast(created ? "Match créé." : "Match enregistré."); if (created) go({ view: "match", matchId: m.id }); }} /><//>`;
+      else if (sheet.type === "match-form") {
+        const upcoming = sheet.m ? q.isUpcoming(sheet.m) : !!sheet.upcoming;
+        const title = upcoming ? (sheet.m ? "Match à venir" : "Ajouter un match à venir") : sheet.m ? "Modifier le match" : "Nouveau match";
+        sheetEl = html`<${Sheet} title=${title} onClose=${close}>
+        <${M.MatchForm} m=${sheet.m} preset=${sheet.preset} upcoming=${upcoming} onDelete=${sheet.m ? () => setSheet({ type: "delete", m: sheet.m }) : null}
+          onDone=${(m, created) => {
+            close();
+            // Un match à venir reste dans le calendrier de l’accueil ; un match joué s’ouvre pour la saisie.
+            if (q.isUpcoming(m)) { U.toast(created ? "Match ajouté au calendrier." : "Match enregistré."); return; }
+            U.toast(created ? "Match créé." : "Match enregistré.");
+            if (created) go({ view: "match", matchId: m.id });
+          }} /><//>`;
+      }
       else if (sheet.type === "import") sheetEl = html`<${Sheet} title="Importer un Excel de match" onClose=${close}>
         <${S.ImportSheet} onDone=${(m) => { close(); U.toast("Match importé."); go({ view: "match", matchId: m.id }); }} /><//>`;
       else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;

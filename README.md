@@ -6,6 +6,7 @@ set par set (en revoyant la vidéo YouTube du match si besoin), chacun écrit so
 l'équipe retrouve les stats du match et de la saison. Le bouton « Excel » d'un match produit
 toujours le fichier au format habituel, et chaque joueur peut télécharger sa fiche au format de
 son onglet pour la coller dans l'Excel du coach (marche à suivre dans le Tuto de l'app).
+L'accueil montre tous les matchs joués et un calendrier où l'on ajoute les prochains matchs.
 
 ## Aperçu
 
@@ -15,7 +16,7 @@ Captures réalisées avec des données fictives (joueurs, adversaires et stats i
 |---|---|
 | ![Saisie](docs/screenshots/02-saisie.png) | ![Synthèse](docs/screenshots/03-match-synthese.png) |
 
-| Accueil | Joueurs et détail set par set |
+| Accueil : matchs et calendrier | Joueurs et détail set par set |
 |---|---|
 | ![Accueil](docs/screenshots/01-accueil.png) | ![Joueurs](docs/screenshots/04-match-joueurs.png) |
 

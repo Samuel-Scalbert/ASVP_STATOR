@@ -37,6 +37,11 @@
   function uid(prefix) {
     return (prefix || "") + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
+  /* Date du jour (heure locale) au format AAAA-MM-JJ, comme les dates des matchs. */
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
   function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
   function statId(matchId, playerId) { return matchId + "__" + playerId; }
 
@@ -492,7 +497,7 @@
 
   const api = {
     MAX_SETS, SET_COLS, setReferential,
-    norm, slug, uid, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
+    norm, slug, uid, todayIso, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
     canonSets, sameSets, diffSets,
     opponentLine, matchSets, matchResult, matchSetCount, seasonOf,
     parseWorkbookData, playerSheetSpec, playerExportSpec, matchWorkbookSpec, seasonWorkbookSpec,

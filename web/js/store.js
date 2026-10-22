@@ -7,7 +7,7 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 4;
+  const API_LEVEL = 5;
   const COLS = ["matches", "stats"];
 
   function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -300,6 +300,15 @@
         return kb.localeCompare(ka) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
     },
+    /* Match à venir : daté après aujourd’hui, sans score ni fiche. Il est dans le calendrier, pas encore dans la liste des matchs. */
+    isUpcoming(m) {
+      return !!m.date && m.date > C.todayIso() && !C.matchResult(m) && !m.noData && !q.statsOf(m.id).some((d) => C.isFilled(d));
+    },
+    played() { return q.matchList().filter((m) => !q.isUpcoming(m)); },
+    upcoming() {
+      const key = (m) => m.date + (m.time || "99:99");
+      return q.matchList().filter((m) => q.isUpcoming(m)).sort((a, b) => key(a).localeCompare(key(b)));
+    },
     statsOf(matchId) { return Object.values(store.stats).filter((d) => d && d.matchId === matchId); },
     /* Fiches dont la version Excel diffère de l’app et n’a pas encore été tranchée. */
     conflictsOf(matchId) {
@@ -313,15 +322,20 @@
       const m = store.matches[matchId];
       return m && Array.isArray(m.squad) && m.squad.length ? m.squad : null;
     },
-    /* Joueurs du match : ceux retenus (ou l’effectif actif), plus ceux qui ont une fiche malgré tout. */
+    /* Joueurs du match : ceux de la liste du match. Sans liste : l’effectif actif, plus ceux qui ont une fiche remplie.
+       La fiche d’un joueur décoché reste en base mais ne compte plus : on le recoche pour la retrouver. */
     playersOf(matchId) {
       const docs = q.statsOf(matchId);
       const squad = q.squadOf(matchId);
       const base = squad ? q.roster().filter((p) => squad.indexOf(p.id) >= 0) : q.active();
       const list = base.map((p) => ({ id: p.id, name: p.name, doc: docs.find((d) => d.playerId === p.id) || null }));
-      docs.forEach((d) => { if (!list.some((x) => x.id === d.playerId)) list.push({ id: d.playerId, name: q.name(d.playerId), doc: d }); });
+      docs.forEach((d) => {
+        const keep = squad ? squad.indexOf(d.playerId) >= 0 : C.isFilled(d);
+        if (keep && !list.some((x) => x.id === d.playerId)) list.push({ id: d.playerId, name: q.name(d.playerId), doc: d });
+      });
       return list;
     },
+    plays(matchId, playerId) { return q.playersOf(matchId).some((p) => p.id === playerId); },
   };
 
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });

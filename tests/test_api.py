@@ -116,4 +116,17 @@ def test_excel_version_pending_on_a_sheet(team):
 
 
 def test_api_level_is_exposed_for_stale_page_detection(client):
-    assert client.get("/api/state").get_json()["app"]["api"] >= 4
+    assert client.get("/api/state").get_json()["app"]["api"] >= 5
+
+
+def test_upcoming_match_time(team):
+    match = {"opponent": "Club Exemple", "date": "2026-11-07", "time": "20:30", "venue": "ext"}
+    assert team.put("/api/matches/m-avenir", json=match).status_code == 200
+    assert team.get("/api/state").get_json()["matches"]["m-avenir"]["time"] == "20:30"
+    # Une ancienne page n'envoie pas l'heure : elle est conservée.
+    assert team.put("/api/matches/m-avenir", json={"opponent": "Club Exemple", "date": "2026-11-07"}).status_code == 200
+    assert team.get("/api/state").get_json()["matches"]["m-avenir"]["time"] == "20:30"
+    assert team.put("/api/matches/m-avenir", json=dict(match, time="")).status_code == 200
+    assert team.get("/api/state").get_json()["matches"]["m-avenir"]["time"] == ""
+    r = team.put("/api/matches/m-avenir", json=dict(match, time="25:00"))
+    assert r.status_code == 400 and "Heure" in r.get_json()["error"]
