@@ -6,7 +6,9 @@ set par set (en revoyant la vidéo YouTube du match si besoin), chacun écrit so
 l'équipe retrouve les stats du match et de la saison. Le bouton « Excel » d'un match produit
 toujours le fichier au format habituel, et chaque joueur peut télécharger sa fiche au format de
 son onglet pour la coller dans l'Excel du coach (marche à suivre dans le Tuto de l'app).
-L'accueil montre tous les matchs joués et un calendrier où l'on ajoute les prochains matchs.
+L'accueil montre tous les matchs joués et le calendrier ; l'onglet Classement suit le championnat
+FFVolley de l'équipe (classement, journées, fiche de chaque adversaire), actualisé chaque matin
+depuis le site de la fédération (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), partie 6).
 
 ## Aperçu
 

@@ -100,6 +100,11 @@ def sheet_doc(s: StatSheet, field_by_id: dict[str, tuple[str, str]]) -> dict:
     }
 
 
+def league_doc() -> dict | None:
+    raw = get_setting("league")
+    return json.loads(raw) if raw else None
+
+
 def state() -> dict:
     by_id = {v: k for k, v in field_ids().items()}
     matches = db.session.scalars(db.select(Match)).all()
@@ -108,6 +113,7 @@ def state() -> dict:
         "config": config_doc(),
         "matches": {m.id: match_doc(m) for m in matches},
         "stats": {s.id: sheet_doc(s, by_id) for s in sheets},
+        "league": league_doc(),
     }
 
 
@@ -296,3 +302,94 @@ def delete_sheet(sheet_id: str) -> bool:
     db.session.delete(s)
     db.session.commit()
     return True
+
+
+# ---------------------------------------------------------------- championnat FFVolley
+# Une seule ligne (réglage « league »), remplacée à chaque actualisation par stator/ffvb.py : les matchs
+# de la poule avec leurs scores. Le classement et les statistiques sont recalculés par la page.
+SEASON_RE = re.compile(r"^\d{4}/\d{4}$")
+CODE_RE = re.compile(r"^[A-Za-z0-9]{1,12}$")
+LEAGUE_CODE_RE = re.compile(r"^[A-Z0-9]{2,8}\d{3}$")
+
+
+def _text(value, what: str, limit: int, required: bool = False) -> str:
+    if value is None:
+        value = ""
+    if not isinstance(value, str) or len(value) > limit or (required and not value.strip()):
+        raise InvalidData(f"Championnat : {what} invalide.")
+    return value.strip()
+
+
+def _league_matches(items, what: str) -> list[dict]:
+    if not isinstance(items, list) or len(items) > 400:
+        raise InvalidData(f"Championnat : liste des matchs ({what}) invalide.")
+    out = []
+    for m in items:
+        if not isinstance(m, dict) or not LEAGUE_CODE_RE.match(str(m.get("code") or "")):
+            raise InvalidData(f"Championnat : match invalide ({what}).")
+        day, hour = m.get("date") or "", m.get("time") or ""
+        if day:
+            _parse_date(day)
+        if hour and not TIME_RE.match(hour):
+            raise InvalidData(f"Championnat : heure invalide ({m['code']}).")
+        sets = m.get("sets") or []
+        if not isinstance(sets, list) or len(sets) > 5 or not all(isinstance(s, list) and len(s) == 2 for s in sets):
+            raise InvalidData(f"Championnat : score des sets invalide ({m['code']}).")
+        doc = {"code": m["code"], "round": _int(m.get("round") or 0, "Journée", 0, 99), "date": day, "time": hour,
+               "home": _text(m.get("home"), "équipe", 60, True), "away": _text(m.get("away"), "équipe", 60, True),
+               "sets": [[_int(a, "Score de set"), _int(b, "Score de set")] for a, b in sets]}
+        gym = _text(m.get("gym"), "salle", 80)
+        if gym:
+            doc["gym"] = gym
+        out.append(doc)
+    return out
+
+
+def _adjust(value) -> dict:
+    if not isinstance(value, dict) or len(value) > 40:
+        raise InvalidData("Championnat : écarts de points invalides.")
+    return {_text(t, "équipe", 60, True): _int(p, "Écart de points", -50, 50) for t, p in value.items()}
+
+
+def save_league(doc: dict) -> dict:
+    src = doc.get("source") or {}
+    if not (isinstance(src, dict) and SEASON_RE.match(str(src.get("season") or ""))
+            and CODE_RE.match(str(src.get("codent") or "")) and CODE_RE.match(str(src.get("poule") or ""))):
+        raise InvalidData("Championnat : source FFVolley invalide (saison, codent, poule).")
+    teams = doc.get("teams") or {}
+    gyms = doc.get("gyms") or {}
+    if not isinstance(teams, dict) or len(teams) > 40 or not isinstance(gyms, dict) or len(gyms) > 80:
+        raise InvalidData("Championnat : équipes ou salles invalides.")
+    clean = {
+        "source": {"season": src["season"], "codent": src["codent"], "poule": src["poule"]},
+        "title": _text(doc.get("title"), "titre", 160),
+        "team": _text(doc.get("team"), "équipe", 60, True),
+        "updatedAt": _text(doc.get("updatedAt"), "date de mise à jour", 40),
+        "matches": _league_matches(doc.get("matches"), "saison en cours"),
+        "adjust": _adjust(doc.get("adjust") or {}),
+        "teams": {},
+        "gyms": {_text(g, "salle", 80, True): _text(a, "adresse", 160) for g, a in gyms.items()},
+        "previous": None,
+    }
+    for name, info in teams.items():
+        if not isinstance(info, dict):
+            raise InvalidData("Championnat : équipe invalide.")
+        site = _text(info.get("site"), "site du club", 200)
+        if site and not re.match(r"^https?://", site):
+            raise InvalidData("Championnat : site du club invalide.")
+        t = {k: v for k, v in {"club": _text(info.get("club"), "club", 80), "colors": _text(info.get("colors"), "couleurs", 60),
+                               "site": site}.items() if v}
+        if t:
+            clean["teams"][_text(name, "équipe", 60, True)] = t
+    prev = doc.get("previous")
+    if prev:
+        if not isinstance(prev, dict) or not SEASON_RE.match(str(prev.get("season") or "")):
+            raise InvalidData("Championnat : saison précédente invalide.")
+        clean["previous"] = {"season": prev["season"], "title": _text(prev.get("title"), "titre", 160),
+                             "matches": _league_matches(prev.get("matches"), "saison précédente"),
+                             "adjust": _adjust(prev.get("adjust") or {})}
+    s = db.session.get(Setting, "league") or Setting(key="league")
+    s.value = json.dumps(clean, ensure_ascii=False, separators=(",", ":"))
+    db.session.add(s)
+    db.session.commit()
+    return clean

@@ -102,6 +102,36 @@ git checkout CODE_DU_COMMIT && touch /var/www/*_wsgi.py
   perdues si on oublie, mais le site est coupé jusqu'au clic.
 - **Offre payante** (*Developer*) : pas d'expiration.
 
+## 6. Championnat FFVolley (classement, calendrier, adversaires)
+
+L'onglet **Classement** et le calendrier de l'accueil viennent du site de la fédération
+(poule *ARM – Accession Régionale Masculine 75*). Le serveur PythonAnywhere gratuit **ne peut pas**
+lire ce site (il n'est pas dans sa liste de sites autorisés), et la page de l'app non plus. C'est
+donc **GitHub** qui fait l'actualisation :
+
+- **Automatique** : chaque matin vers 7 h, le workflow
+  [`.github/workflows/championnat.yml`](.github/workflows/championnat.yml) lit la poule et envoie
+  les matchs à l'app. Rien à faire, une fois le code poussé et le serveur mis à jour.
+- **Tout de suite** (après un match) : sur GitHub, onglet **Actions** › *Championnat FFVolley* ›
+  **Run workflow**. Les nouveaux résultats sont dans l'app une minute plus tard.
+- **Depuis un PC** (sans rien installer d'autre que Python) :
+
+  ```bash
+  python stator/ffvb.py --app https://samuelscalbert.eu.pythonanywhere.com
+  python stator/ffvb.py --app http://127.0.0.1:5000 --essai   # pour voir sans rien envoyer
+  ```
+
+**Ce qui est gardé** : un seul document d'environ 16 Ko, remplacé à chaque actualisation, avec les
+matchs de la poule (date, heure, équipes, scores des sets), ceux de la saison précédente, l'adresse
+des salles des prochains matchs et la couleur des maillots. Ni pages, ni PDF, ni noms de personnes ;
+le classement et les statistiques sont recalculés par la page.
+
+**Nouvelle saison** : le script passe tout seul à la saison suivante si la même poule existe. Si
+l'équipe change de division, donner une fois l'adresse de la nouvelle poule (page de la poule sur
+le site FFVolley) : `python stator/ffvb.py --app … --poule "ADRESSE"`. Une autre adresse d'app se
+règle dans GitHub : *Settings* › *Secrets and variables* › *Actions* › *Variables*, variable
+`STATOR_URL`.
+
 ## À savoir avant d'ouvrir l'app à l'équipe
 
 L'app n'a pas encore de mot de passe : toute personne qui a le lien peut modifier ou supprimer

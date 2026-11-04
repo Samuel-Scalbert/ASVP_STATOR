@@ -65,20 +65,22 @@
     const conflicts = q.conflictsOf(m.id);
     const out = !!me && !q.plays(m.id, me);
     const state = myState(m, me);
-    const sets = C.matchSets(m);
-    const r = C.matchResult(m);
+    // Pas de score dans l’app : on affiche celui du championnat (site FFVolley), sans le recopier.
+    const off = !C.matchResult(m) && root.StatorLeague ? root.StatorLeague.officialFor(m) : null;
+    const sets = off ? off.sets : C.matchSets(m);
+    const r = off ? off.result : C.matchResult(m);
     const where = [venueLabel(m.venue), m.competition].filter(Boolean).join(" · ");
     return html`<section class="hero">
       <div class="hero-top">
         <span class="eyebrow on-band">${featured ? "Dernier match · " : ""}${fmtDate(m.date)}${where ? " · " + where : ""}</span>
-        ${r ? html`<${ResultChip} m=${m} />` : null}
+        ${r ? html`<${ResultChip} m=${off ? { sets: off.sets } : m} />` : null}
       </div>
       <div class=${cx("board", !featured && "sm")}>
         <span class="board-team">ASVP</span>
         <span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span>
         <span class="board-team opp">${m.opponent}</span>
       </div>
-      <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}</div>
+      <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
       <div class="hero-foot">
         <div class="hero-state">
           ${m.noData
@@ -105,17 +107,25 @@
   function Calendar({ go, openSheet }) {
     const today = C.todayIso();
     const [cur, setCur] = useState(() => ({ y: Number(today.slice(0, 4)), mo: Number(today.slice(5, 7)) - 1 }));
-    const next = q.upcoming();
+    const LG = root.StatorLeague;
+    // Matchs du championnat (site FFVolley) qui n’ont pas encore de match dans l’app : affichés tels quels, sans copie.
+    const fixtures = LG ? LG.calendarFixtures() : [];
     const byDay = {};
-    q.matchList().forEach((m) => { if (m.date && !byDay[m.date]) byDay[m.date] = m; });
+    q.matchList().forEach((m) => { if (m.date && !byDay[m.date]) byDay[m.date] = { m }; });
+    fixtures.forEach((x) => { if (!byDay[x.f.date]) byDay[x.f.date] = { x }; });
+    const next = q.upcoming().map((m) => ({ key: m.id, date: m.date, time: m.time || "", m }))
+      .concat(fixtures.filter((x) => x.upcoming).map((x) => ({ key: x.f.code, date: x.f.date, time: x.f.time, x })))
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     const lead = (new Date(cur.y, cur.mo, 1).getDay() + 6) % 7; // semaines du lundi au dimanche
     const n = new Date(cur.y, cur.mo + 1, 0).getDate();
     const cells = Array.from({ length: lead }, () => null).concat(Array.from({ length: n }, (_, i) => isoDay(cur.y, cur.mo, i + 1)));
     const move = (k) => { const d = new Date(cur.y, cur.mo + k, 1); setCur({ y: d.getFullYear(), mo: d.getMonth() }); };
     const month = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(cur.y, cur.mo, 1));
     const openMatch = (m) => (q.isUpcoming(m) ? openSheet({ type: "match-form", m }) : go({ view: "match", matchId: m.id }));
+    const openEntry = (e) => (e.x ? openSheet({ type: "team", team: e.x.opp }) : openMatch(e.m));
     // Un jour vide : match à venir s’il est dans le futur, sinon match déjà joué à enregistrer.
     const addOn = (day) => openSheet({ type: "match-form", preset: { date: day }, upcoming: !day || day > today });
+    const soon = (k) => (k === 0 ? "Aujourd’hui" : k === 1 ? "Demain" : "J-" + k);
     return html`<section class="card cal">
       <div class="cal-head">
         <h2 class="h-sec">Calendrier</h2>
@@ -129,24 +139,31 @@
         ${WEEKDAYS.map((w, i) => html`<span key=${"w" + i} class="cal-wd" aria-hidden="true">${w}</span>`)}
         ${cells.map((day, i) => {
           if (!day) return html`<span key=${"b" + i} class="cal-day blank"></span>`;
-          const m = byDay[day];
-          const up = !!m && q.isUpcoming(m);
+          const e = byDay[day];
+          const opp = e ? (e.x ? e.x.opp : e.m.opponent) : "";
+          const up = !!e && (e.x ? e.x.upcoming : q.isUpcoming(e.m));
           const label = fmtDate(day, { weekday: "long", day: "numeric", month: "long" })
-            + (m ? " : ASVP – " + m.opponent + (up ? ", à venir" : "") : store.readOnly ? "" : ", ajouter un match");
-          return html`<button type="button" key=${day} class=${cx("cal-day", day === today && "today", day < today && "past", m && (up ? "up" : "played"))}
-            disabled=${!m && store.readOnly} aria-label=${label} title=${m ? "ASVP – " + m.opponent : ""} onClick=${() => (m ? openMatch(m) : addOn(day))}>${Number(day.slice(8))}</button>`;
+            + (e ? " : ASVP – " + opp + (up ? ", à venir" : "") : store.readOnly ? "" : ", ajouter un match");
+          return html`<button type="button" key=${day} class=${cx("cal-day", day === today && "today", day < today && "past", e && (up ? "up" : "played"))}
+            disabled=${!e && store.readOnly} aria-label=${label} title=${e ? "ASVP – " + opp : ""} onClick=${() => (e ? openEntry(e) : addOn(day))}>${Number(day.slice(8))}</button>`;
         })}
       </div>
       <div class="cal-legend" aria-hidden="true"><span><i class="lg-played"></i>Joué</span><span><i class="lg-up"></i>À venir</span><span><i class="lg-today"></i>Aujourd’hui</span></div>
       <div class="cal-next">
         <h3 class="h-sub">À venir</h3>
-        ${next.length ? html`<ul class="next-list">${next.map((m) => { const k = daysUntil(m.date); return html`<li key=${m.id}><button type="button" class="next-row" onClick=${() => openMatch(m)}>
-            <span class="next-date"><b>${Number(m.date.slice(8))}</b><small>${fmtDate(m.date, { month: "short" })}</small></span>
-            <span class="next-main"><b>${m.opponent}</b><small>${[fmtDate(m.date, { weekday: "long" }) + (m.time ? " " + fmtTime(m.time) : ""), venueLabel(m.venue), m.competition].filter(Boolean).join(" · ")}</small></span>
-            <span class="next-in">${k === 1 ? "Demain" : "J-" + k}</span>
+        ${next.length ? html`<ul class="next-list">${next.slice(0, 5).map((e) => {
+          const k = daysUntil(e.date), m = e.m, x = e.x;
+          const detail = x
+            ? [fmtDate(e.date, { weekday: "long" }) + (e.time ? " " + fmtTime(e.time) : ""), x.home ? "Domicile" : "Extérieur", x.gym]
+            : [fmtDate(e.date, { weekday: "long" }) + (e.time ? " " + fmtTime(e.time) : ""), venueLabel(m.venue), m.competition];
+          return html`<li key=${e.key}><button type="button" class="next-row" onClick=${() => openEntry(e)}>
+            <span class="next-date"><b>${Number(e.date.slice(8))}</b><small>${fmtDate(e.date, { month: "short" })}</small></span>
+            <span class="next-main"><b>${x ? x.opp : m.opponent}${x && x.rank ? html` <span class="rank-chip sm">${LG.ordinal(x.rank)}</span>` : null}</b><small>${detail.filter(Boolean).join(" · ")}</small></span>
+            <span class="next-in">${soon(k)}</span>
           </button></li>`; })}</ul>`
           : html`<p class="muted small">Aucun match prévu. Ajoute le prochain : toute l’équipe verra la date.</p>`}
-        ${!store.readOnly && html`<button type="button" class="btn primary sm" onClick=${() => addOn("")}><${Icon} name="plus" size=${16} />Ajouter un match à venir</button>`}
+        ${next.length > 5 ? html`<button type="button" class="linkish small" onClick=${() => go({ view: "league" })}>Tout le calendrier du championnat</button>` : null}
+        ${!store.readOnly && html`<button type="button" class="btn primary sm" onClick=${() => addOn("")}><${Icon} name="plus" size=${16} />${fixtures.length ? "Ajouter un autre match (amical…)" : "Ajouter un match à venir"}</button>`}
       </div>
     </section>`;
   }
@@ -702,8 +719,14 @@
     const m = store.matches[matchId];
     const [busy, setBusy] = useState(false);
     if (!m) return html`<div class="page"><section class="card empty-state"><p>Ce match n’existe plus.</p><button class="btn ghost" onClick=${() => go({ view: "home" })}>Retour aux matchs</button></section></div>`;
-    const sets = C.matchSets(m);
-    const r = C.matchResult(m);
+    const off = !C.matchResult(m) && root.StatorLeague ? root.StatorLeague.officialFor(m) : null;
+    const sets = off ? off.sets : C.matchSets(m);
+    const r = off ? off.result : C.matchResult(m);
+    // Le score officiel n’est enregistré dans le match que sur demande (il sert alors au contrôle des stats).
+    const adoptOfficial = () => {
+      api.saveMatch(Object.assign({}, m, { sets: off.sets, result: null, updatedAt: new Date().toISOString() }));
+      U.toast("Score officiel enregistré dans le match.");
+    };
     const doExport = async () => {
       setBusy(true);
       try {
@@ -724,13 +747,14 @@
           <div class="mb-main">
             <span class="eyebrow on-band">${fmtDate(m.date)}${m.time ? " · " + fmtTime(m.time) : ""}${venueLabel(m.venue) ? " · " + venueLabel(m.venue) : ""}${m.competition ? " · " + m.competition : ""}</span>
             <div class="board sm"><span class="board-team">ASVP</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}</span></div>
-            <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}</div>
+            <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
             ${m.noData && html`<div class="board-sets"><${NoDataBadge} /></div>`}
             ${m.closed && !m.noData && html`<div class="board-sets"><${ClosedBadge} band /></div>`}
           </div>
         </div>
         <div class="match-actions">
           ${!store.readOnly && !m.noData && !m.closed && html`<button class="btn primary sm" onClick=${() => go(entryRoute(m, me))}>Saisir les stats</button>`}
+          ${off && !store.readOnly ? html`<button class="btn on-band-ghost sm" onClick=${adoptOfficial}><${Icon} name="check" size=${16} />Enregistrer le score officiel</button>` : null}
           ${m.video && html`<a class="btn on-band-ghost sm" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} />Vidéo YouTube</a>`}
           ${m.videoKind === "discord" && html`<span class="video-chip" title=${m.videoNote || ""}><${Icon} name="play" size=${15} />Vidéo : fichier sur Discord${m.videoNote ? " · " + m.videoNote : ""}</span>`}
           ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${toggleClosed}><${Icon} name=${m.closed ? "undo" : "check"} size=${16} />${m.closed ? "Rouvrir la saisie" : "Clôturer la saisie"}</button>`}

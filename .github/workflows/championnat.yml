@@ -1,0 +1,20 @@
+# Actualise chaque matin le championnat FFVolley dans l'app : matchs de la poule, scores, salles.
+# Le serveur PythonAnywhere gratuit ne peut pas joindre le site de la fédération : c'est GitHub qui lit
+# le site, puis envoie les données à l'app (voir stator/ffvb.py et DEPLOIEMENT.md).
+name: Championnat FFVolley
+
+on:
+  schedule:
+    - cron: "15 6 * * *"   # chaque jour vers 7h15 (heure de Paris en hiver)
+  workflow_dispatch:         # bouton « Run workflow » de l'onglet Actions, pour actualiser tout de suite
+
+jobs:
+  actualiser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lire le site FFVolley et mettre à jour l'app
+        run: python3 stator/ffvb.py
+        env:
+          STATOR_URL: ${{ vars.STATOR_URL || 'https://samuelscalbert.eu.pythonanywhere.com' }}

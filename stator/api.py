@@ -63,3 +63,9 @@ def put_stats(sheet_id: str):
 def delete_stats(sheet_id: str):
     services.delete_sheet(sheet_id)
     return "", 204
+
+
+@bp.put("/league")
+def put_league():
+    """Données du championnat FFVolley, envoyées par stator/ffvb.py (voir ce module)."""
+    return jsonify(services.save_league(_body()))

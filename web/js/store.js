@@ -22,6 +22,7 @@
     notice: null,           // { kind, text }
     config: null, matches: {}, stats: {},
     app: null,              // version du serveur (mode api) : { version, commit, date }
+    league: null,           // championnat FFVolley (mode api) : matchs de la poule, voir stator/ffvb.py
     v: 0, subs: new Set(), db: null,
   };
   function emit() { store.v++; store.subs.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); }
@@ -178,6 +179,7 @@
     checkServerLevel();
     applyConfig(first.config);
     COLS.forEach((c) => applyCollection(c, first[c] || {}));
+    store.league = first.league || null; // championnat FFVolley (lecture seule, voir stator/ffvb.py)
     store.ready = true;
     emit();
     let busy = false;
@@ -193,6 +195,7 @@
         } else checkServerLevel();
         applyConfig(s.config);
         COLS.forEach((c) => applyCollection(c, s[c] || {}));
+        store.league = s.league || null;
         if (store.notice && store.notice.kind === "net") store.notice = null;
         emit();
       } catch (e) { /* le serveur reviendra ; on garde l’affichage */ }

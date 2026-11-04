@@ -7,11 +7,13 @@
   const U = root.StatorUI;
   const M = root.StatorMatch;
   const S = root.StatorSeason;
+  const LG = root.StatorLeague;
   const { Icon, Sheet, Toasts, cx } = U;
 
   const NAV = [
     { view: "home", label: "Matchs", icon: "cal", hash: "matchs" },
     { view: "newmatch", label: "Nouveau match", short: "Nouveau", icon: "plus", hash: "nouveau" },
+    { view: "league", label: "Classement", icon: "trophy", hash: "classement" },
     { view: "season", label: "Saison", icon: "chart", hash: "saison" },
     { view: "tuto", label: "Tuto", icon: "book", hash: "tuto" },
     { view: "team", label: "Équipe", icon: "users", hash: "equipe" },
@@ -123,6 +125,7 @@
       body = html`<${M.MatchView} matchId=${route.matchId} me=${meValid} go=${go} openSheet=${openSheet} sub=${sub} setSub=${setSub} />`;
     } else if (view === "newmatch") body = html`<${M.NewMatch} go=${go} />`;
     else if (view === "season") body = html`<${S.Season} go=${go} />`;
+    else if (view === "league") body = html`<${LG.Standings} openSheet=${openSheet} />`;
     else if (view === "tuto" || view === "guide") body = html`<${root.StatorTuto.Tuto} anchor=${route.anchor} />`;
     else if (view === "team") body = html`<${S.Team} go=${go} openSheet=${openSheet} me=${meValid} />`;
     else body = html`<${M.Home} me=${meValid} go=${go} openSheet=${openSheet} />`;
@@ -151,6 +154,8 @@
       else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
       else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · ASVP – " + sheet.m.opponent} onClose=${close} wide>
         <${M.ExcelMerge} m=${sheet.m} onDone=${(r) => { close(); U.toast(U.plural(r.added, "fiche ajoutée", "fiches ajoutées") + (r.conflicts ? " · " + U.plural(r.conflicts, "différence", "différences") + " à trancher (ATTENTION)" : "") + "."); }} /><//>`;
+      else if (sheet.type === "team") sheetEl = html`<${Sheet} title=${sheet.team} onClose=${close} wide>
+        <${LG.TeamSheet} team=${sheet.team} go=${(r) => { close(); go(r); }} openSheet=${openSheet} /><//>`;
       else if (sheet.type === "delete") sheetEl = html`<${Sheet} title="Supprimer le match" onClose=${close}>
         <${M.DeleteMatch} m=${sheet.m} onCancel=${close} onDone=${() => { close(); U.toast("Match supprimé."); go({ view: "home" }); }} /><//>`;
     }
