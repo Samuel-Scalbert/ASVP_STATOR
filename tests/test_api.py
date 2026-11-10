@@ -130,3 +130,17 @@ def test_upcoming_match_time(team):
     assert team.get("/api/state").get_json()["matches"]["m-avenir"]["time"] == ""
     r = team.put("/api/matches/m-avenir", json=dict(match, time="25:00"))
     assert r.status_code == 400 and "Heure" in r.get_json()["error"]
+
+
+def test_installable_app_manifest_and_icons(client):
+    page = client.get("/").data
+    assert b'rel="manifest" href="manifest.webmanifest"' in page and b'rel="apple-touch-icon"' in page
+    res = client.get("/manifest.webmanifest")
+    assert res.status_code == 200 and res.mimetype == "application/manifest+json"
+    manifest = res.get_json(force=True)
+    assert manifest["display"] == "standalone" and manifest["short_name"]
+    sizes = {i["sizes"] for i in manifest["icons"]}
+    assert {"192x192", "512x512"} <= sizes and any(i.get("purpose") == "maskable" for i in manifest["icons"])
+    for icon in manifest["icons"] + [i for s in manifest["shortcuts"] for i in s["icons"]]:
+        img = client.get("/" + icon["src"])
+        assert img.status_code == 200 and img.mimetype == "image/png", icon["src"]

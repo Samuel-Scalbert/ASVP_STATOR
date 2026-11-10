@@ -41,6 +41,11 @@ SKELETON = (
     '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
     '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
     '<link rel="icon" href="img/logo-asvp.png">'
+    # App installée sur un téléphone : nom, icône (Android via le manifeste, iPhone via apple-touch-icon), couleur.
+    '<link rel="manifest" href="manifest.webmanifest">'
+    '<link rel="apple-touch-icon" href="img/apple-touch-icon.png">'
+    '<meta name="apple-mobile-web-app-title" content="ASVP Stator">'
+    '<meta name="theme-color" content="#0b1526">'
     "<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}"
     "body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>"
     "</head><body>{page}</body></html>"
@@ -118,6 +123,8 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     @app.get("/<path:path>")
     def web_file(path: str):
+        if path == "manifest.webmanifest":
+            return send_from_directory(WEB_DIR, path, max_age=0, mimetype="application/manifest+json")
         if path.startswith("api/") or not (path.startswith(("js/", "img/")) or path == "referentiel.json"):
             abort(404)
         return send_from_directory(WEB_DIR, path, max_age=0)

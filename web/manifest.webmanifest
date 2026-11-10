@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "ASVP Stator",
+  "short_name": "ASVP Stator",
+  "description": "Les stats de match de l'ASVP Alsa Team : saisie set par set, bilans, saison et championnat.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1526",
+  "theme_color": "#0b1526",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Classement", "url": "./#classement", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Nouveau match", "url": "./#nouveau", "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}
