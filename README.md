@@ -9,8 +9,10 @@ son onglet pour la coller dans l'Excel du coach (marche à suivre dans le Tuto d
 L'accueil montre tous les matchs joués et le calendrier ; l'onglet Classement suit le championnat
 FFVolley de l'équipe (classement, journées, fiche de chaque adversaire), actualisé chaque matin
 depuis le site de la fédération (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), partie 6).
-Chaque match à venir a sa page : infos pratiques (salle, itinéraire, maillots), compo du coach sur le
-terrain avec les rotations et le libéro, binômes et remplaçants, consignes de jeu.
+Chaque match à venir a sa page : consignes du coach par priorité (rouge, orange, vert), compo sur le
+terrain (une couleur par poste, libéro, binômes, remplaçants, compos types réutilisables), infos
+pratiques (échauffement une heure avant, salle, itinéraire, maillots). Sur l'accueil, une barre suit les
+fiches remplies et nomme les retardataires quand il en manque peu.
 
 ## Aperçu
 

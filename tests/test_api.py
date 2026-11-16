@@ -146,41 +146,55 @@ def test_installable_app_manifest_and_icons(client):
         assert img.status_code == 200 and img.mimetype == "image/png", icon["src"]
 
 
-LINEUP = {"label": "Compo 1", "positions": {"1": "joueur-a", "2": "joueur-c"}, "libero": "joueur-b", "liberoFor": ["joueur-a"]}
+LINEUP = {"label": "Set 1", "positions": {"1": "joueur-a", "2": "joueur-c"}, "libero": "joueur-b",
+          "pairs": [["joueur-a", "joueur-c"]], "comment": "Compo de base"}
+CONSIGNES = [{"text": "Servir long", "level": 1}, {"text": "Bloc sur le pointu", "level": 2}]
 
 
-def test_coach_lineups_and_note(team):
-    match = {"opponent": "Club Exemple", "date": "2026-12-05", "lineups": [LINEUP], "note": "- Servir long\n- Bloc sur le pointu"}
+def test_coach_lineups_and_consignes(team):
+    match = {"opponent": "Club Exemple", "date": "2026-12-05", "lineups": [LINEUP], "consignes": CONSIGNES}
     assert team.put("/api/matches/m-prepa", json=match).status_code == 200
     m = team.get("/api/state").get_json()["matches"]["m-prepa"]
-    assert m["lineups"] == [LINEUP] and m["note"] == "- Servir long\n- Bloc sur le pointu"
+    assert m["lineups"] == [LINEUP] and m["consignes"] == CONSIGNES
     # Une page plus ancienne n'envoie ni compos ni consignes : elles sont conservées.
     assert team.put("/api/matches/m-prepa", json={"opponent": "Club Exemple", "date": "2026-12-05"}).status_code == 200
     m = team.get("/api/state").get_json()["matches"]["m-prepa"]
-    assert m["lineups"] == [LINEUP] and m["note"]
-    # Compos vidées explicitement.
-    assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[], note="")).status_code == 200
+    assert m["lineups"] == [LINEUP] and m["consignes"] == CONSIGNES
+    assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[], consignes=[])).status_code == 200
     m = team.get("/api/state").get_json()["matches"]["m-prepa"]
-    assert m["lineups"] == [] and m["note"] == ""
+    assert m["lineups"] == [] and m["consignes"] == []
     bad = [dict(LINEUP, positions={"1": "joueur-a", "2": "joueur-a"}),      # un joueur à deux positions
            dict(LINEUP, positions={"7": "joueur-a"}),                        # position inconnue
            dict(LINEUP, libero="joueur-a"),                                  # le libéro est aussi en position 1
-           dict(LINEUP, liberoFor=["joueur-z"])]                             # remplace un joueur pas sur le terrain
+           dict(LINEUP, pairs=[["joueur-a", "joueur-a"]]),                   # binôme avec soi-même
+           dict(LINEUP, comment="x" * 1001)]
     for lineup in bad:
         assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[lineup])).status_code == 400
     assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[LINEUP] * 5)).status_code == 400
-    assert team.put("/api/matches/m-prepa", json=dict(match, note="x" * 4001)).status_code == 400
+    for consignes in ([{"text": "x", "level": 4}], [{"text": "x" * 301, "level": 1}], [{"text": "x"}]):
+        assert team.put("/api/matches/m-prepa", json=dict(match, consignes=consignes)).status_code == 400
 
 
-def test_player_pairs(team):
+def test_old_free_text_note_becomes_consignes(team, app):
+    from stator.models import Match, db
+    with app.app_context():
+        db.session.get(Match, "m-exemple").coach_note = "- Servir long\n- Bloc fermé"
+        db.session.commit()
+    assert team.get("/api/state").get_json()["matches"]["m-exemple"]["consignes"] == [
+        {"text": "Servir long", "level": 2}, {"text": "Bloc fermé", "level": 2}]
+
+
+def test_lineup_templates(team):
     roster = [{"id": "joueur-a", "name": "Joueur A", "active": True, "poste": "central"},
               {"id": "joueur-b", "name": "Joueur B", "active": True, "poste": "libero"},
               {"id": "joueur-c", "name": "Joueur C", "active": True}]
-    assert team.put("/api/config", json={"roster": roster, "pairs": [["joueur-a", "joueur-c"]]}).status_code == 200
-    assert team.get("/api/state").get_json()["config"]["pairs"] == [["joueur-a", "joueur-c"]]
-    assert team.put("/api/config", json={"roster": roster}).status_code == 200            # sans le champ : conservés
-    assert team.get("/api/state").get_json()["config"]["pairs"] == [["joueur-a", "joueur-c"]]
-    for pairs in ([["joueur-a", "joueur-a"]], [["joueur-a", "joueur-z"]], [["joueur-a", "joueur-b"], ["joueur-b", "joueur-c"]]):
-        assert team.put("/api/config", json={"roster": roster, "pairs": pairs}).status_code == 400
-    assert team.put("/api/config", json={"roster": roster, "pairs": []}).status_code == 200
-    assert team.get("/api/state").get_json()["config"]["pairs"] == []
+    tpl = {"id": "t-base", "name": "Compo de base", "positions": {"3": "joueur-a"}, "libero": "joueur-b",
+           "pairs": [["joueur-a", "joueur-c"]], "comment": ""}
+    assert team.put("/api/config", json={"roster": roster, "templates": [tpl]}).status_code == 200
+    assert team.get("/api/state").get_json()["config"]["templates"] == [dict(tpl, label="")]
+    assert team.put("/api/config", json={"roster": roster}).status_code == 200            # sans le champ : conservées
+    assert len(team.get("/api/state").get_json()["config"]["templates"]) == 1
+    for templates in ([dict(tpl, name="")], [dict(tpl, pairs=[["joueur-a", "joueur-z"]])], [tpl] * 13):
+        assert team.put("/api/config", json={"roster": roster, "templates": templates}).status_code == 400
+    assert team.put("/api/config", json={"roster": roster, "templates": []}).status_code == 200
+    assert team.get("/api/state").get_json()["config"]["templates"] == []

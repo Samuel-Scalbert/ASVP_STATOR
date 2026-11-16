@@ -24,6 +24,23 @@
     const ps = q.playersOf(matchId);
     return { done: ps.filter((p) => C.isFilled(p.doc)).length, total: ps.length, ps };
   }
+  /* Avancement des saisies : complet (tout le monde a saisi, ou match marqué terminé), retardataires à nommer quand il manque 30 % au plus. */
+  function progressOf(m, comp) {
+    const pct = comp.total ? Math.round((100 * comp.done) / comp.total) : 0;
+    const complete = !m.noData && (m.closed || (comp.total > 0 && comp.done === comp.total));
+    const missing = comp.ps.filter((p) => !C.isFilled(p.doc)).map((p) => p.name);
+    return { pct, complete, missing, nearly: !complete && !m.noData && comp.total > 0 && comp.done / comp.total >= 0.7 };
+  }
+  function ProgressBar({ pr, comp }) {
+    return html`<div class=${cx("prog", pr.complete && "complete")} role="progressbar" aria-valuenow=${pr.pct} aria-valuemin="0" aria-valuemax="100" aria-label="Fiches remplies">
+      <div class="prog-bar"><i style=${"width:" + (pr.complete ? 100 : pr.pct) + "%"}></i></div>
+      <span class="prog-txt">${pr.complete ? html`<${Icon} name="check" size=${14} />Complet` : comp.done + "/" + comp.total + " fiches · " + pr.pct + " %"}</span>
+    </div>`;
+  }
+  function MissingBubble({ pr }) {
+    if (!pr.nearly) return null;
+    return html`<div class="miss-bubble" role="status"><span class="miss-dot">${pr.missing.length}</span><span><b>${pr.missing.length > 1 ? "Il manque encore" : "Il manque encore la fiche de"}</b> ${pr.missing.join(", ")}</span></div>`;
+  }
 
   /* ---------- Choix du joueur ---------- */
   function WhoGrid({ me, onPick }) {
@@ -70,7 +87,8 @@
     const sets = off ? off.sets : C.matchSets(m);
     const r = off ? off.result : C.matchResult(m);
     const where = [venueLabel(m.venue), m.competition].filter(Boolean).join(" · ");
-    return html`<section class="hero">
+    const pr = progressOf(m, comp);
+    return html`<section class=${cx("hero", pr.complete && "complete")}>
       <div class="hero-top">
         <span class="eyebrow on-band">${featured ? "Dernier match · " : ""}${fmtDate(m.date)}${where ? " · " + where : ""}</span>
         ${r ? html`<${ResultChip} m=${off ? { sets: off.sets } : m} />` : null}
@@ -82,12 +100,14 @@
       </div>
       <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
       <div class="hero-foot">
+        ${m.noData ? null : html`<${ProgressBar} pr=${pr} comp=${comp} />`}
         <div class="hero-state">
           ${m.noData
             ? html`<span><${NoDataBadge} /> Pas de vidéo : seul le score est enregistré.</span>`
             : m.closed ? html`<span><${ClosedBadge} band /> ${U.plural(comp.done, "fiche remplie", "fiches remplies")}</span>`
             : html`${state ? html`<span>Ta fiche : <b>${state}</b></span>` : out ? html`<span>Tu n’es pas dans les joueurs de ce match</span>` : null}<span>${comp.done}/${comp.total} joueurs ont saisi</span>`}
         </div>
+        <${MissingBubble} pr=${pr} />
         ${conflicts.length ? html`<div class="hero-alert" role="alert"><span class="alert-badge">ATTENTION</span>${conflicts.length > 1 ? conflicts.length + " fiches diffèrent" : "1 fiche diffère"} de l’Excel du coach : différences non résolues (${conflicts.map((d) => q.name(d.playerId)).join(", ")}).</div>` : null}
         <div class="hero-actions">
           ${!store.readOnly && !m.noData && !m.closed && !out && html`<button class=${cx("btn primary", !featured && "sm")} onClick=${() => go(entryRoute(m, me))}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
@@ -483,22 +503,26 @@
   /* ---------- Vue d’un match ---------- */
   function Completion({ comp, me, m, go }) {
     const mine = me ? comp.ps.find((p) => p.id === me) : null;
+    const pr = progressOf(m, comp);
     if (m.closed) {
       const done = comp.ps.filter((p) => C.isFilled(p.doc));
       return html`<section class="card">
         <div class="block-head"><h2 class="h-sec">Saisies</h2><${ClosedBadge} /></div>
-        <p>${U.plural(done.length, "fiche remplie", "fiches remplies")} sur ${comp.total} joueurs du match. La saisie est terminée : les points non notés ne sont pas comptabilisés.</p>
+        <${ProgressBar} pr=${pr} comp=${comp} />
+        <p>${U.plural(done.length, "fiche remplie", "fiches remplies")} sur ${comp.total} joueurs du match. Le match est marqué terminé : les points non notés ne sont pas comptabilisés.</p>
         <div class="chips">${done.map((p) => html`<span key=${p.id} class="chip done"><${Icon} name="check" size=${13} />${p.name}</span>`)}</div>
       </section>`;
     }
     return html`<section class="card">
       <div class="block-head"><h2 class="h-sec">Saisies</h2><span class="muted">${comp.done} sur ${comp.total} joueurs</span></div>
+      <${ProgressBar} pr=${pr} comp=${comp} />
+      <${MissingBubble} pr=${pr} />
       <div class="chips">
         ${comp.ps.map((p) => html`<span key=${p.id} class=${cx("chip", C.isFilled(p.doc) ? "done" : "todo", p.doc && p.doc.excel && p.doc.excel.status === "pending" && "alert")}>
           ${C.isFilled(p.doc) && html`<${Icon} name="check" size=${13} />`}${p.name}</span>`)}
       </div>
       ${me && !store.readOnly && mine && !C.isFilled(mine.doc) && html`<div class="row-btns"><button class="btn primary" onClick=${() => go({ view: "entry", matchId: m.id })}>Saisir mes stats</button></div>`}
-      <p class="muted small">Quand tout le monde a fini, « Clôturer la saisie » (en haut) arrête le suivi : l’écart avec le score sera compté comme points non notés.</p>
+      <p class="muted small">${pr.complete ? "Toutes les fiches sont remplies : le match est complet." : "Si des joueurs ne saisiront pas, « Marquer terminé » (en haut) arrête le suivi : l’écart avec le score sera compté comme points non notés."}</p>
     </section>`;
   }
   function ScoreCheck({ m, perSet, openForm }) {
@@ -584,7 +608,7 @@
       <${Completion} comp=${comp} me=${me} m=${m} go=${go} />
       <details class="card prep-wrap" open=${root.StatorPrep.hasPrep(m)}>
         <summary>Préparation du match<small>${root.StatorPrep.hasPrep(m) ? "compo et consignes du coach" : "compo, consignes"}</small></summary>
-        <div class="prep-inner"><${root.StatorPrep.LineupCard} m=${m} openSheet=${openSheet} compact /><${root.StatorPrep.NoteCard} m=${m} openSheet=${openSheet} /></div>
+        <div class="prep-inner"><${root.StatorPrep.ConsignesCard} m=${m} openSheet=${openSheet} /><${root.StatorPrep.LineupCard} m=${m} openSheet=${openSheet} compact /></div>
       </details>
       <section class="card">
         <h2 class="h-sec">L’équipe sur ce match</h2>
@@ -643,7 +667,7 @@
         </tfoot>
       </table></div>
       <p class="muted small">${withScore
-        ? (m.closed ? "Saisie close : les points non notés (moments sans vidéo, ou fautes de l’adversaire) ne sont pas comptabilisés."
+        ? (m.closed ? "Match terminé : les points non notés (moments sans vidéo, ou fautes de l’adversaire) ne sont pas comptabilisés."
           : d.k === "P" ? "Écart = points venus des fautes adverses ou d’actions non saisies." : "Écart = points marqués par l’adversaire sur ses propres actions, ou non saisis.")
         : d.rate ? C.SKILL[d.k].rateText + ", set par set et sur le match." : "« – » : pas de stat sur ce set (joueur pas sur le terrain)."}</p>
     </section>`;
@@ -693,7 +717,7 @@
       </section>
       <${SetDetail} m=${m} filled=${filled} nSets=${nSets} />`}
       ${sel && filled.length > rows.length ? html`<p class="muted small">Aucune stat sur le set ${sel} (pas joué) : ${filled.filter((p) => !C.countActions(C.setsArray(p.doc)[sel - 1])).map((p) => p.name).join(", ")}.</p>` : null}
-      ${missing.length ? html`<p class="muted small">${m.closed ? "Sans fiche (saisie close)" : "Pas encore de fiche"} : ${missing.map((p) => p.name).join(", ")}.</p>` : null}`;
+      ${missing.length ? html`<p class="muted small">${m.closed ? "Sans fiche (match terminé)" : "Pas encore de fiche"} : ${missing.map((p) => p.name).join(", ")}.</p>` : null}`;
   }
   function Bilans({ m }) {
     const ps = q.playersOf(m.id).filter((p) => p.doc && C.hasBilan(p.doc));
@@ -742,7 +766,7 @@
     const tabs = [["synthese", "Synthèse"], ["joueurs", "Joueurs"], ["bilans", "Bilans"]];
     const toggleClosed = () => {
       api.saveMatch(Object.assign({}, m, { closed: !m.closed, updatedAt: new Date().toISOString() }));
-      U.toast(m.closed ? "Saisie rouverte : les joueurs peuvent à nouveau remplir leur fiche." : "Saisie close : les points non notés ne sont pas comptabilisés.");
+      U.toast(m.closed ? "Match rouvert : les joueurs peuvent à nouveau remplir leur fiche." : "Match marqué terminé : les points non notés ne sont pas comptabilisés.");
     };
     return html`<div>
       <section class="match-band">
@@ -761,7 +785,7 @@
           ${off && !store.readOnly ? html`<button class="btn on-band-ghost sm" onClick=${adoptOfficial}><${Icon} name="check" size=${16} />Enregistrer le score officiel</button>` : null}
           ${m.video && html`<a class="btn on-band-ghost sm" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} />Vidéo YouTube</a>`}
           ${m.videoKind === "discord" && html`<span class="video-chip" title=${m.videoNote || ""}><${Icon} name="play" size=${15} />Vidéo : fichier sur Discord${m.videoNote ? " · " + m.videoNote : ""}</span>`}
-          ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${toggleClosed}><${Icon} name=${m.closed ? "undo" : "check"} size=${16} />${m.closed ? "Rouvrir la saisie" : "Clôturer la saisie"}</button>`}
+          ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${toggleClosed}><${Icon} name=${m.closed ? "undo" : "check"} size=${16} />${m.closed ? "Rouvrir la saisie" : "Marquer terminé"}</button>`}
           ${!store.readOnly && !m.noData && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "excel-merge", m })}><${Icon} name="up" size=${16} />Compléter avec l’Excel</button>`}
           ${!m.noData && html`<button class="btn on-band-ghost sm" onClick=${doExport} disabled=${busy}><${Icon} name="down" size=${16} />${busy ? "Préparation…" : "Excel"}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Modifier</button>`}
@@ -791,7 +815,7 @@
     </section>`;
   }
   function ClosedBadge({ band }) {
-    return html`<span class=${cx("closed-badge", band && "band")}><${Icon} name="check" size=${13} />Saisie close</span>`;
+    return html`<span class=${cx("closed-badge", band && "band")}><${Icon} name="check" size=${13} />Terminé</span>`;
   }
   function NoDataBadge({ sm }) {
     return html`<span class=${cx("nodata-badge", sm && "sm")} title="Pas de vidéo : score seulement">NO VIDEO / NO DATA</span>`;

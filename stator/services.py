@@ -62,7 +62,7 @@ def config_doc() -> dict | None:
         "season": get_setting("season"),
         "roster": [{"id": p.id, "name": p.name, "active": p.active, **({"poste": p.poste} if p.poste else {})}
                    for p in players],
-        "pairs": json.loads(get_setting("pairs") or "[]"),
+        "templates": json.loads(get_setting("lineup_templates") or "[]"),
     }
 
 
@@ -81,7 +81,7 @@ def match_doc(m: Match) -> dict:
         "sets": [{"a": s.asvp, "o": s.opp} for s in m.set_scores],
         "result": result, "source": m.source or "",
         "lineups": json.loads(m.lineup_json) if m.lineup_json else [],
-        "note": m.coach_note or "",
+        "consignes": consignes_doc(m.coach_note or ""),
         "createdAt": _iso(m.created_at), "updatedAt": _iso(m.updated_at),
     }
 
@@ -148,52 +148,96 @@ def save_config(doc: dict, roles: set[str]) -> None:
             raise InvalidData(f"Poste inconnu : {poste}.")
         p = ensure_player(pid, name)
         p.name, p.poste, p.active, p.sort_order = name[:120], poste, item.get("active", True) is not False, i
-    if "pairs" in doc:  # binômes : deux joueurs aux profils proches (une page d'avant les binômes ne les envoie pas)
+    if "templates" in doc:  # compos types du coach (une page plus ancienne ne les envoie pas : on les garde)
         ids = {item.get("id") for item in doc.get("roster", [])}
-        pairs = doc.get("pairs") or []
-        if not isinstance(pairs, list) or len(pairs) > 30:
-            raise InvalidData("Binômes invalides.")
-        seen: set[str] = set()
-        for pair in pairs:
-            if not isinstance(pair, list) or len(pair) != 2 or pair[0] == pair[1] or not set(pair) <= ids or seen & set(pair):
-                raise InvalidData("Un binôme réunit deux joueurs différents de l'effectif, chacun dans un seul binôme.")
-            seen |= set(pair)
-        s = db.session.get(Setting, "pairs") or Setting(key="pairs")
-        s.value = json.dumps(pairs, separators=(",", ":"))
+        templates = doc.get("templates") or []
+        if not isinstance(templates, list) or len(templates) > 12:
+            raise InvalidData("Compos types : 12 au plus.")
+        clean = []
+        for t in templates:
+            if not isinstance(t, dict) or not t.get("name") or not isinstance(t["name"], str) or len(t["name"]) > 40:
+                raise InvalidData("Compo type : un nom de 40 caractères au plus.")
+            clean.append({"id": _check_id(t.get("id"), "compo type"), "name": t["name"].strip(), **_lineup(t, ids)})
+        s = db.session.get(Setting, "lineup_templates") or Setting(key="lineup_templates")
+        s.value = json.dumps(clean, ensure_ascii=False, separators=(",", ":"))
         db.session.add(s)
     db.session.commit()
 
 
+def _pairs(items, ids: set[str]) -> list[list[str]]:
+    """Binômes d'une compo : deux joueurs différents, chacun dans un seul binôme."""
+    if not isinstance(items, list) or len(items) > 10:
+        raise InvalidData("Binômes : 10 au plus.")
+    seen: set[str] = set()
+    for pair in items:
+        if not isinstance(pair, list) or len(pair) != 2 or pair[0] == pair[1] or seen & set(pair):
+            raise InvalidData("Un binôme réunit deux joueurs différents, chacun dans un seul binôme.")
+        for pid in pair:
+            _check_id(pid, "joueur")
+            if ids and pid not in ids:
+                raise InvalidData("Binôme : joueur inconnu de l'effectif.")
+        seen |= set(pair)
+    return [list(p) for p in items]
+
+
+def _lineup(item, ids: set[str] | None = None) -> dict:
+    """Une compo : libellé, joueurs en positions 1 à 6, libéro, binômes, commentaire du coach."""
+    if not isinstance(item, dict):
+        raise InvalidData("Compo invalide.")
+    label = item.get("label") or ""
+    comment = item.get("comment") or ""
+    if not isinstance(label, str) or len(label) > 40 or not isinstance(comment, str) or len(comment) > 1000:
+        raise InvalidData("Compo : libellé de 40 caractères et commentaire de 1000 caractères au plus.")
+    positions = item.get("positions") or {}
+    if not isinstance(positions, dict) or not set(positions) <= {"1", "2", "3", "4", "5", "6"}:
+        raise InvalidData("Compo : positions 1 à 6 attendues.")
+    placed = {k: _check_id(v, "joueur") for k, v in positions.items() if v}
+    if len(set(placed.values())) != len(placed):
+        raise InvalidData("Compo : un joueur ne peut occuper qu'une position.")
+    libero = item.get("libero") or ""
+    if libero:
+        _check_id(libero, "joueur")
+        if libero in placed.values():
+            raise InvalidData("Compo : le libéro n'occupe pas une des six positions.")
+    return {"label": label.strip(), "positions": placed, "libero": libero,
+            "pairs": _pairs(item.get("pairs") or [], ids or set()), "comment": comment.strip()}
+
+
 def _lineups(items) -> list[dict]:
-    """Compos du coach : jusqu'à 4, chacune avec un libellé, les joueurs en positions 1 à 6, le libéro et
-    les joueurs qu'il remplace. Une position vide est simplement absente."""
+    """Compos du coach sur un match : 4 au plus."""
     if not isinstance(items, list) or len(items) > 4:
         raise InvalidData("Compos : 4 au plus.")
+    return [_lineup(item) for item in items]
+
+
+LEVELS = {1, 2, 3}  # consignes : 1 essentiel (rouge), 2 important (orange), 3 bon à savoir (vert)
+
+
+def _consignes(items) -> list[dict]:
+    if not isinstance(items, list) or len(items) > 30:
+        raise InvalidData("Consignes : 30 au plus.")
     out = []
     for item in items:
-        if not isinstance(item, dict):
-            raise InvalidData("Compo invalide.")
-        label = item.get("label") or ""
-        if not isinstance(label, str) or len(label) > 40:
-            raise InvalidData("Compo : libellé de 40 caractères au plus.")
-        positions = item.get("positions") or {}
-        if not isinstance(positions, dict) or not set(positions) <= {"1", "2", "3", "4", "5", "6"}:
-            raise InvalidData("Compo : positions 1 à 6 attendues.")
-        placed = {k: _check_id(v, "joueur") for k, v in positions.items() if v}
-        if len(set(placed.values())) != len(placed):
-            raise InvalidData("Compo : un joueur ne peut occuper qu'une position.")
-        libero = item.get("libero") or ""
-        if libero:
-            _check_id(libero, "joueur")
-            if libero in placed.values():
-                raise InvalidData("Compo : le libéro n'occupe pas une des six positions.")
-        libero_for = item.get("liberoFor")
-        if libero_for is not None:
-            if not isinstance(libero_for, list) or len(libero_for) > 2 or not set(libero_for) <= set(placed.values()):
-                raise InvalidData("Compo : le libéro remplace un ou deux joueurs placés sur le terrain.")
-        out.append({"label": label.strip(), "positions": placed, "libero": libero,
-                    **({"liberoFor": list(dict.fromkeys(libero_for))} if libero_for is not None else {})})
+        text = item.get("text") if isinstance(item, dict) else None
+        level = item.get("level") if isinstance(item, dict) else None
+        if not isinstance(text, str) or len(text) > 300 or level not in LEVELS:
+            raise InvalidData("Consigne : un texte de 300 caractères au plus et une priorité de 1 à 3.")
+        if text.strip():
+            out.append({"text": text.strip(), "level": level})
     return out
+
+
+def consignes_doc(raw: str) -> list[dict]:
+    """Consignes stockées en JSON ; un ancien texte libre devient une consigne par ligne."""
+    if not raw:
+        return []
+    try:
+        items = json.loads(raw)
+        if isinstance(items, list):
+            return items
+    except ValueError:
+        pass
+    return [{"text": line.strip().lstrip("-•* ").strip(), "level": 2} for line in raw.split("\n") if line.strip()]
 
 
 def _parse_date(value) -> date | None:
@@ -249,11 +293,8 @@ def save_match(match_id: str, doc: dict) -> Match:
     m.source = str(doc.get("source") or m.source or "")[:200]
     if "lineups" in doc:  # compos du coach (absentes des envois d'une page plus ancienne : on les garde)
         m.lineup_json = json.dumps(_lineups(doc.get("lineups")), ensure_ascii=False, separators=(",", ":"))
-    if "note" in doc:
-        note = doc.get("note") or ""
-        if not isinstance(note, str) or len(note) > 4000:
-            raise InvalidData("Consignes du coach : texte de 4000 caractères au plus.")
-        m.coach_note = note.strip()
+    if "consignes" in doc:
+        m.coach_note = json.dumps(_consignes(doc.get("consignes") or []), ensure_ascii=False, separators=(",", ":"))
     if isinstance(result, dict):
         m.result_asvp = _int(result.get("a"), "Sets gagnés", 0, 3)
         m.result_opp = _int(result.get("o"), "Sets perdus", 0, 3)

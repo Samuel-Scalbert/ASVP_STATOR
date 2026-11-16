@@ -155,10 +155,10 @@
       else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
       else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · ASVP – " + sheet.m.opponent} onClose=${close} wide>
         <${M.ExcelMerge} m=${sheet.m} onDone=${(r) => { close(); U.toast(U.plural(r.added, "fiche ajoutée", "fiches ajoutées") + (r.conflicts ? " · " + U.plural(r.conflicts, "différence", "différences") + " à trancher (ATTENTION)" : "") + "."); }} /><//>`;
-      else if (sheet.type === "lineup") sheetEl = html`<${Sheet} title=${"Compo du coach · ASVP – " + sheet.m.opponent} onClose=${close} wide>
-        <${P.LineupEditor} m=${sheet.m} onDone=${(n) => { close(); U.toast(n ? "Compo enregistrée." : "Compo effacée."); }} /><//>`;
-      else if (sheet.type === "note") sheetEl = html`<${Sheet} title=${"Consignes du coach · ASVP – " + sheet.m.opponent} onClose=${close}>
-        <${P.NoteEditor} m=${sheet.m} onDone=${() => { close(); U.toast("Consignes enregistrées."); }} /><//>`;
+      else if (sheet.type === "lineup") sheetEl = html`<${Sheet} title=${sheet.m ? "Compo du coach · ASVP – " + sheet.m.opponent : sheet.template ? "Compo type · " + sheet.template.name : "Nouvelle compo type"} onClose=${close} wide>
+        <${P.LineupEditor} m=${sheet.m} template=${sheet.template} onDone=${(n) => { close(); U.toast(sheet.m ? (n ? "Compo enregistrée." : "Compo effacée.") : "Compo type enregistrée."); }} /><//>`;
+      else if (sheet.type === "consignes") sheetEl = html`<${Sheet} title=${"Consignes du coach · ASVP – " + sheet.m.opponent} onClose=${close}>
+        <${P.ConsignesEditor} m=${sheet.m} onDone=${(n) => { close(); U.toast(n ? "Consignes enregistrées." : "Consignes effacées."); }} /><//>`;
       else if (sheet.type === "team") sheetEl = html`<${Sheet} title=${sheet.team} onClose=${close} wide>
         <${LG.TeamSheet} team=${sheet.team} go=${(r) => { close(); go(r); }} openSheet=${openSheet} /><//>`;
       else if (sheet.type === "delete") sheetEl = html`<${Sheet} title="Supprimer le match" onClose=${close}>

@@ -198,14 +198,9 @@
       setNewName("");
     };
     const setPoste = (id, poste) => save({ roster: roster.map((p) => (p.id === id ? Object.assign({}, p, { poste }) : p)) });
-    // Binômes : deux joueurs aux profils proches, chacun dans un seul binôme.
-    const pairs = q.pairs();
-    const [pa, setPa] = useState("");
-    const [pb, setPb] = useState("");
-    const paired = new Set([].concat.apply([], pairs));
-    const free = roster.filter((p) => p.active !== false && !paired.has(p.id));
-    const addPair = (e) => { e.preventDefault(); if (!pa || !pb || pa === pb) return; save({ pairs: pairs.concat([[pa, pb]]) }); setPa(""); setPb(""); };
-    const removePair = (i) => save({ pairs: pairs.filter((_, j) => j !== i) });
+    // Compos types du coach : réutilisées d’un match à l’autre (éditeur de compo, « Partir d’une compo type »).
+    const templates = q.templates();
+    const removeTemplate = (id) => save({ templates: templates.filter((t) => t.id !== id) });
     return html`<div class="page">
       <span class="eyebrow">Équipe</span>
       <h1 class="h-page">Effectif et réglages</h1>
@@ -230,16 +225,13 @@
         <p class="muted small">Un joueur retiré garde ses stats passées ; il n’apparaît plus dans les nouveaux matchs.</p>
       </section>
       <section class="card">
-        <h2 class="h-sec">Binômes</h2>
-        <p class="muted small">Deux joueurs aux profils proches : dans la compo du coach, l’un est le remplaçant naturel de l’autre.</p>
-        ${pairs.length ? html`<ul class="pairs">${pairs.map(([a, b], i) => html`<li key=${a + b}><b>${q.name(a)}</b><${Icon} name="swap" size=${16} /><b>${q.name(b)}</b>
-          ${!ro && html`<button class="icon-btn" aria-label=${"Défaire le binôme " + q.name(a) + " – " + q.name(b)} onClick=${() => removePair(i)}><${Icon} name="x" size=${16} /></button>`}</li>`)}</ul>`
-          : html`<p class="muted small">Aucun binôme pour l’instant.</p>`}
-        ${!ro && free.length >= 2 && html`<form class="add-row" onSubmit=${addPair}>
-          <select aria-label="Premier joueur du binôme" value=${pa} onChange=${(e) => setPa(e.target.value)}><option value="">Joueur…</option>${free.map((p) => html`<option key=${p.id} value=${p.id}>${p.name}${q.posteLabel(p.id) ? " · " + q.posteLabel(p.id) : ""}</option>`)}</select>
-          <select aria-label="Second joueur du binôme" value=${pb} onChange=${(e) => setPb(e.target.value)}><option value="">avec…</option>${free.filter((p) => p.id !== pa).map((p) => html`<option key=${p.id} value=${p.id}>${p.name}${q.posteLabel(p.id) ? " · " + q.posteLabel(p.id) : ""}</option>`)}</select>
-          <button class="btn dark sm" type="submit" disabled=${!pa || !pb}><${Icon} name="swap" size=${16} />Former le binôme</button>
-        </form>`}
+        <div class="block-head"><h2 class="h-sec">Compos types</h2>${!ro && html`<button class="btn dark sm" onClick=${() => openSheet({ type: "lineup", template: null })}><${Icon} name="plus" size=${16} />Nouvelle compo type</button>`}</div>
+        <p class="muted small">Six de départ, libéro, binômes et commentaire : le coach les réutilise d’un match à l’autre (« Partir d’une compo type » dans la compo d’un match).</p>
+        ${templates.length ? html`<ul class="tpl-rows">${templates.map((t) => html`<li key=${t.id}>
+          <div class="tpl-main"><b>${t.name}</b><small>${Object.keys(t.positions || {}).length} sur le terrain${t.libero ? " + libéro" : ""}${(t.pairs || []).length ? " · " + plural(t.pairs.length, "binôme", "binômes") : ""}</small></div>
+          ${!ro && html`<div class="row-btns"><button class="btn ghost sm" onClick=${() => openSheet({ type: "lineup", template: t })}><${Icon} name="edit" size=${15} />Modifier</button>
+            <button class="icon-btn" aria-label=${"Supprimer la compo type " + t.name} onClick=${() => removeTemplate(t.id)}><${Icon} name="trash" size=${16} /></button></div>`}
+        </li>`)}</ul>` : html`<p class="muted small">Aucune compo type pour l’instant.</p>`}
       </section>
 
       <div class="col">
