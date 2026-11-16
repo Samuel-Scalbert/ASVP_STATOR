@@ -144,3 +144,43 @@ def test_installable_app_manifest_and_icons(client):
     for icon in manifest["icons"] + [i for s in manifest["shortcuts"] for i in s["icons"]]:
         img = client.get("/" + icon["src"])
         assert img.status_code == 200 and img.mimetype == "image/png", icon["src"]
+
+
+LINEUP = {"label": "Compo 1", "positions": {"1": "joueur-a", "2": "joueur-c"}, "libero": "joueur-b", "liberoFor": ["joueur-a"]}
+
+
+def test_coach_lineups_and_note(team):
+    match = {"opponent": "Club Exemple", "date": "2026-12-05", "lineups": [LINEUP], "note": "- Servir long\n- Bloc sur le pointu"}
+    assert team.put("/api/matches/m-prepa", json=match).status_code == 200
+    m = team.get("/api/state").get_json()["matches"]["m-prepa"]
+    assert m["lineups"] == [LINEUP] and m["note"] == "- Servir long\n- Bloc sur le pointu"
+    # Une page plus ancienne n'envoie ni compos ni consignes : elles sont conservées.
+    assert team.put("/api/matches/m-prepa", json={"opponent": "Club Exemple", "date": "2026-12-05"}).status_code == 200
+    m = team.get("/api/state").get_json()["matches"]["m-prepa"]
+    assert m["lineups"] == [LINEUP] and m["note"]
+    # Compos vidées explicitement.
+    assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[], note="")).status_code == 200
+    m = team.get("/api/state").get_json()["matches"]["m-prepa"]
+    assert m["lineups"] == [] and m["note"] == ""
+    bad = [dict(LINEUP, positions={"1": "joueur-a", "2": "joueur-a"}),      # un joueur à deux positions
+           dict(LINEUP, positions={"7": "joueur-a"}),                        # position inconnue
+           dict(LINEUP, libero="joueur-a"),                                  # le libéro est aussi en position 1
+           dict(LINEUP, liberoFor=["joueur-z"])]                             # remplace un joueur pas sur le terrain
+    for lineup in bad:
+        assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[lineup])).status_code == 400
+    assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[LINEUP] * 5)).status_code == 400
+    assert team.put("/api/matches/m-prepa", json=dict(match, note="x" * 4001)).status_code == 400
+
+
+def test_player_pairs(team):
+    roster = [{"id": "joueur-a", "name": "Joueur A", "active": True, "poste": "central"},
+              {"id": "joueur-b", "name": "Joueur B", "active": True, "poste": "libero"},
+              {"id": "joueur-c", "name": "Joueur C", "active": True}]
+    assert team.put("/api/config", json={"roster": roster, "pairs": [["joueur-a", "joueur-c"]]}).status_code == 200
+    assert team.get("/api/state").get_json()["config"]["pairs"] == [["joueur-a", "joueur-c"]]
+    assert team.put("/api/config", json={"roster": roster}).status_code == 200            # sans le champ : conservés
+    assert team.get("/api/state").get_json()["config"]["pairs"] == [["joueur-a", "joueur-c"]]
+    for pairs in ([["joueur-a", "joueur-a"]], [["joueur-a", "joueur-z"]], [["joueur-a", "joueur-b"], ["joueur-b", "joueur-c"]]):
+        assert team.put("/api/config", json={"roster": roster, "pairs": pairs}).status_code == 400
+    assert team.put("/api/config", json={"roster": roster, "pairs": []}).status_code == 200
+    assert team.get("/api/state").get_json()["config"]["pairs"] == []

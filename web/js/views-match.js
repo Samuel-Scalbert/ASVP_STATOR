@@ -121,7 +121,7 @@
     const cells = Array.from({ length: lead }, () => null).concat(Array.from({ length: n }, (_, i) => isoDay(cur.y, cur.mo, i + 1)));
     const move = (k) => { const d = new Date(cur.y, cur.mo + k, 1); setCur({ y: d.getFullYear(), mo: d.getMonth() }); };
     const month = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(cur.y, cur.mo, 1));
-    const openMatch = (m) => (q.isUpcoming(m) ? openSheet({ type: "match-form", m }) : go({ view: "match", matchId: m.id }));
+    const openMatch = (m) => go({ view: "match", matchId: m.id }); // un match à venir a sa page : compo, consignes, infos
     const openEntry = (e) => (e.x ? openSheet({ type: "team", team: e.x.opp }) : openMatch(e.m));
     // Un jour vide : match à venir s’il est dans le futur, sinon match déjà joué à enregistrer.
     const addOn = (day) => openSheet({ type: "match-form", preset: { date: day }, upcoming: !day || day > today });
@@ -255,14 +255,12 @@
       if (!upcoming && !noData && choices.length && !squad.length) { setErr("Coche au moins un joueur du match."); return; }
       if (!noData && videoKind === "lien" && !/^https?:\/\//i.test(video.trim())) { setErr("Colle le lien complet de la vidéo, qui commence par https://"); return; }
       const order = roster.map((x) => x.id);
-      // Match à venir : pas encore de liste de joueurs (tout l’effectif) ; on la règle le jour du match avec « Modifier ».
-      const keptSquad = m && Array.isArray(m.squad) ? m.squad : [];
       const doc = Object.assign({}, m || { id: C.uid("m-"), createdAt: new Date().toISOString() }, {
         opponent: opp.trim(), date, time, venue, competition: comp.trim(), sets: upcoming ? [] : sets, result: res, noData,
         videoKind: noData ? "" : videoKind,
         video: !noData && videoKind === "lien" ? video.trim() : "",
         videoNote: !noData && videoKind === "discord" ? videoNote.trim() : "",
-        squad: upcoming ? keptSquad : noData ? [] : squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
+        squad: noData ? [] : squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
       });
       api.saveMatch(doc);
       onDone(doc, !editing);
@@ -281,6 +279,20 @@
             <span>ASVP</span><input id="f-ra" inputmode="numeric" aria-label="Sets gagnés par ASVP" value=${ra} onInput=${(e) => setRa(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} />
             <span>–</span><input id="f-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>${opp.trim() || "Adv."}</span>
           </div></div>`}`;
+    const squadFields = choices.length ? html`<fieldset class="field">
+        <legend><b>${upcoming ? "Joueurs convoqués" : "Joueurs du match"}</b><small>${squad.length} sur ${choices.length} · ${upcoming ? "ils apparaissent dans la compo du coach" : "ce sont eux qui remplissent une fiche"}</small></legend>
+        <div class="row-btns">
+          <button type="button" class="btn ghost sm" onClick=${() => setSquad(activeIds)}>Tout l’effectif</button>
+          ${lastSquad && html`<button type="button" class="btn ghost sm" onClick=${() => setSquad(lastSquad.slice())}>Comme au dernier match</button>`}
+          <button type="button" class="btn ghost sm" onClick=${() => setSquad([])}>Personne</button>
+        </div>
+        <div class="squad-grid">
+          ${choices.map((x) => { const on = squad.indexOf(x.id) >= 0; return html`<button type="button" key=${x.id} class=${cx("squad-chip", on && "on")} aria-pressed=${on} onClick=${() => { toggle(x.id); setErr(""); }}>
+            <span class="squad-box" aria-hidden="true">${on ? html`<${Icon} name="check" size=${14} />` : null}</span>
+            <span class="squad-name">${x.name}${q.posteLabel(x.id) ? html`<small>${q.posteLabel(x.id)}</small>` : null}</span></button>`; })}
+        </div>
+        ${setAside.length ? html`<small class="warn">Fiche mise de côté, plus comptée dans le match : ${setAside.map((x) => x.name).join(", ")}. Recoche pour la retrouver.</small>` : null}
+      </fieldset>` : html`<p class="muted small">L’effectif est vide : ajoute les joueurs dans l’onglet Équipe pour choisir qui joue ce match.</p>`;
     return html`<form class="form" onSubmit=${submit}>
       <div class="field"><span class="lbl"><b>Type de match</b></span>
         <div class="type-pick" role="radiogroup" aria-label="Type de match">
@@ -299,26 +311,13 @@
         <div class="seg-ctl" role="group" aria-label="Lieu">
           ${[["dom", "Domicile"], ["ext", "Extérieur"]].map(([k, l]) => html`<button type="button" key=${k} class=${venue === k ? "on" : ""} aria-pressed=${venue === k} onClick=${() => setVenue(venue === k ? "" : k)}>${l}</button>`)}
         </div></div>
-      ${upcoming ? html`<p class="muted small">Le match apparaît dans le calendrier de l’accueil. Le jour du match, il rejoint la liste des matchs : coche alors les joueurs et ajoute la vidéo avec « Modifier ».</p>` : html`
+      ${upcoming ? html`<p class="muted small">Le match apparaît dans le calendrier et a sa page : compo, consignes et infos pratiques. Le jour du match, il rejoint la liste des matchs pour la saisie.</p>${squadFields}` : html`
       <label class=${cx("nodata-toggle", noData && "on")} for="f-nodata">
         <input id="f-nodata" type="checkbox" checked=${noData} onChange=${(e) => { setNoData(e.target.checked); setErr(""); }} />
         <span><b>Pas de vidéo : score seulement</b>
           <small>Le match sera marqué <span class="nodata-badge sm">NO VIDEO / NO DATA</span> : on enregistre le score, sans fiches à remplir. Si la vidéo arrive plus tard, il suffira de décocher.</small></span>
       </label>
-      ${noData ? null : choices.length ? html`<fieldset class="field">
-        <legend><b>Joueurs du match</b><small>${squad.length} sur ${choices.length} · ce sont eux qui remplissent une fiche</small></legend>
-        <div class="row-btns">
-          <button type="button" class="btn ghost sm" onClick=${() => setSquad(activeIds)}>Tout l’effectif</button>
-          ${lastSquad && html`<button type="button" class="btn ghost sm" onClick=${() => setSquad(lastSquad.slice())}>Comme au dernier match</button>`}
-          <button type="button" class="btn ghost sm" onClick=${() => setSquad([])}>Personne</button>
-        </div>
-        <div class="squad-grid">
-          ${choices.map((x) => { const on = squad.indexOf(x.id) >= 0; return html`<button type="button" key=${x.id} class=${cx("squad-chip", on && "on")} aria-pressed=${on} onClick=${() => { toggle(x.id); setErr(""); }}>
-            <span class="squad-box" aria-hidden="true">${on ? html`<${Icon} name="check" size=${14} />` : null}</span>
-            <span class="squad-name">${x.name}${q.posteLabel(x.id) ? html`<small>${q.posteLabel(x.id)}</small>` : null}</span></button>`; })}
-        </div>
-        ${setAside.length ? html`<small class="warn">Fiche mise de côté, plus comptée dans le match : ${setAside.map((x) => x.name).join(", ")}. Recoche pour la retrouver.</small>` : null}
-      </fieldset>` : html`<p class="muted small">L’effectif est vide : ajoute les joueurs dans l’onglet Équipe pour choisir qui joue ce match.</p>`}
+      ${noData ? null : squadFields}
       ${!noData && html`<fieldset class="field"><legend><b>Vidéo du match</b><small>Facultatif</small></legend>
         <div class="seg-ctl" role="group" aria-label="Vidéo du match">
           ${[["", "Aucune"], ["lien", "Lien YouTube"], ["discord", "Fichier sur Discord"]].map(([k, l]) => html`<button type="button" key=${k || "aucune"} class=${videoKind === k ? "on" : ""} aria-pressed=${videoKind === k} onClick=${() => { setVideoKind(k); setErr(""); }}>${l}</button>`)}
@@ -583,6 +582,10 @@
         <div class="chips">${conf.map((d) => html`<button key=${d.id} class="chip alert" onClick=${() => openSheet({ type: "player", p: { id: d.playerId, name: q.name(d.playerId) }, m })}>${q.name(d.playerId)}</button>`)}</div>
       </section>` : null}
       <${Completion} comp=${comp} me=${me} m=${m} go=${go} />
+      <details class="card prep-wrap" open=${root.StatorPrep.hasPrep(m)}>
+        <summary>Préparation du match<small>${root.StatorPrep.hasPrep(m) ? "compo et consignes du coach" : "compo, consignes"}</small></summary>
+        <div class="prep-inner"><${root.StatorPrep.LineupCard} m=${m} openSheet=${openSheet} compact /><${root.StatorPrep.NoteCard} m=${m} openSheet=${openSheet} /></div>
+      </details>
       <section class="card">
         <h2 class="h-sec">L’équipe sur ce match</h2>
         <div class="kpis">
@@ -719,6 +722,7 @@
     const m = store.matches[matchId];
     const [busy, setBusy] = useState(false);
     if (!m) return html`<div class="page"><section class="card empty-state"><p>Ce match n’existe plus.</p><button class="btn ghost" onClick=${() => go({ view: "home" })}>Retour aux matchs</button></section></div>`;
+    if (q.isUpcoming(m)) return html`<${root.StatorPrep.Upcoming} m=${m} go=${go} openSheet=${openSheet} />`;
     const off = !C.matchResult(m) && root.StatorLeague ? root.StatorLeague.officialFor(m) : null;
     const sets = off ? off.sets : C.matchSets(m);
     const r = off ? off.result : C.matchResult(m);

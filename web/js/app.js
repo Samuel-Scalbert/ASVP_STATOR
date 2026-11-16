@@ -8,6 +8,7 @@
   const M = root.StatorMatch;
   const S = root.StatorSeason;
   const LG = root.StatorLeague;
+  const P = root.StatorPrep;
   const { Icon, Sheet, Toasts, cx } = U;
 
   const NAV = [
@@ -108,7 +109,7 @@
     if ((view === "entry" || view === "match") && store.ready && !store.matches[route.matchId]) view = "home";
     if (view === "entry" && (!meValid || store.readOnly)) view = store.ready ? "match" : view;
     const em = store.ready && store.matches[route.matchId];
-    if (view === "entry" && em && (em.noData || em.closed)) view = "match"; // pas de saisie : match sans vidéo, ou saisie close
+    if (view === "entry" && em && (em.noData || em.closed || q.isUpcoming(em))) view = "match"; // pas de saisie : sans vidéo, saisie close, ou match à venir
     const active = view === "entry" || view === "match" ? "home" : view === "guide" ? "tuto" : view;
     const loading = !store.ready;
     if (loading && view === "entry") view = "loading";
@@ -154,6 +155,10 @@
       else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
       else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · ASVP – " + sheet.m.opponent} onClose=${close} wide>
         <${M.ExcelMerge} m=${sheet.m} onDone=${(r) => { close(); U.toast(U.plural(r.added, "fiche ajoutée", "fiches ajoutées") + (r.conflicts ? " · " + U.plural(r.conflicts, "différence", "différences") + " à trancher (ATTENTION)" : "") + "."); }} /><//>`;
+      else if (sheet.type === "lineup") sheetEl = html`<${Sheet} title=${"Compo du coach · ASVP – " + sheet.m.opponent} onClose=${close} wide>
+        <${P.LineupEditor} m=${sheet.m} onDone=${(n) => { close(); U.toast(n ? "Compo enregistrée." : "Compo effacée."); }} /><//>`;
+      else if (sheet.type === "note") sheetEl = html`<${Sheet} title=${"Consignes du coach · ASVP – " + sheet.m.opponent} onClose=${close}>
+        <${P.NoteEditor} m=${sheet.m} onDone=${() => { close(); U.toast("Consignes enregistrées."); }} /><//>`;
       else if (sheet.type === "team") sheetEl = html`<${Sheet} title=${sheet.team} onClose=${close} wide>
         <${LG.TeamSheet} team=${sheet.team} go=${(r) => { close(); go(r); }} openSheet=${openSheet} /><//>`;
       else if (sheet.type === "delete") sheetEl = html`<${Sheet} title="Supprimer le match" onClose=${close}>

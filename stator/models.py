@@ -57,6 +57,8 @@ class Match(db.Model):
     result_asvp: Mapped[int | None] = mapped_column(Integer)
     result_opp: Mapped[int | None] = mapped_column(Integer)
     source: Mapped[str] = mapped_column(String(200), default="")
+    lineup_json: Mapped[str] = mapped_column(Text, default="")  # compos du coach : positions 1 à 6, libéro (JSON, voir services)
+    coach_note: Mapped[str] = mapped_column(Text, default="")  # consignes de jeu du coach, affichées sur la fiche du match
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

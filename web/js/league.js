@@ -64,6 +64,31 @@
     const s = side(f, L.team);
     return { code: f.code, sets: s.sets.map(([a, o]) => ({ a, o })), result: { a: s.won, o: s.lost } };
   }
+  /* Le match de la poule (joué ou non) qui correspond à un match de l’app. */
+  function fixtureFor(m) {
+    const L = store.league;
+    if (!L) return null;
+    return L.matches.find((x) => (m.id === "m-" + x.code.toLowerCase() || (m.date && x.date === m.date)) && (x.home === L.team || x.away === L.team)) || null;
+  }
+  /* Pour la page d’un match à venir : salle et adresse, maillots, classement et forme de l’adversaire. */
+  function fixtureInfo(m) {
+    const L = store.league, f = fixtureFor(m);
+    if (!L || !f) return null;
+    const s = side(f, L.team), rows = table(L.matches, L.adjust), r = rows.find((x) => x.team === s.opp);
+    const teams = L.teams || {}, gymAddr = f.gym ? (L.gyms || {})[f.gym] : "";
+    const last = r && r.form.length ? r.form[r.form.length - 1] : null;
+    const vs = (ms) => ms.filter((x) => isPlayed(x) && [x.home, x.away].includes(s.opp) && [x.home, x.away].includes(L.team)).sort(byDate).map((x) => side(x, L.team));
+    const h2hText = (list) => list.map((x) => `${x.won > x.lost ? "victoire" : "défaite"} ${x.won}–${x.lost}`).join(", ");
+    const now = vs(L.matches), prev = L.previous ? vs(L.previous.matches) : [];
+    return {
+      code: f.code, round: f.round, title: niceTitle(L.title), team: s.opp,
+      gym: f.gym ? { name: nice(f.gym), address: gymAddr ? nice(gymAddr) : "", maps: mapsUrl(f.gym, gymAddr || "Paris") } : null,
+      ourColors: (teams[L.team] || {}).colors || "", theirColors: (teams[s.opp] || {}).colors || "",
+      rank: r ? r.rank : 0, teams: rows.length, pts: r ? r.pts : 0, v: r ? r.v : 0, d: r ? r.d : 0, sw: r ? r.sw : 0, sl: r ? r.sl : 0,
+      last: last ? `${last.won > last.lost ? "victoire" : "défaite"} ${last.won}–${last.lost} contre ${last.opp}` : "",
+      h2h: [now.length ? "cette saison " + h2hText(now) : "", prev.length ? "saison " + L.previous.season + " " + h2hText(prev) : ""].filter(Boolean).join(" · "),
+    };
+  }
   /* Crée dans l’app le match d’une journée, pour y saisir les stats (identifiant fixe : pas de doublon). */
   function createFromFixture(f) {
     const L = store.league, s = side(f, L.team), now = new Date().toISOString();
@@ -270,8 +295,10 @@
             ${!isPlayed(f) && f.gym ? html`<p class="vs-gym"><${Icon} name="pin" size=${16} /><span><b>${nice(f.gym)}</b>${gymAddr ? html`<br />${nice(gymAddr)}` : null}</span>
               <a class="btn ghost sm" href=${mapsUrl(f.gym, gymAddr || "Paris")} target="_blank" rel="noopener noreferrer">Itinéraire</a></p>` : null}
             ${!isPlayed(f) && (info.colors || ourInfo.colors) ? html`<p class="muted small">Maillots : ${us} ${(ourInfo.colors || "?").toLowerCase()} · ${team} ${(info.colors || "?").toLowerCase()}.</p>` : null}
-            ${app ? html`<div><button class="btn ghost sm" onClick=${() => open(app)}>Ouvrir le match dans l’app</button></div>`
-              : !store.readOnly && (isPlayed(f) || (f.date && f.date <= today)) ? html`<div><button class="btn primary sm" onClick=${() => open(createFromFixture(f))}>Créer ce match dans l’app pour la saisie</button></div>` : null}
+            ${app ? html`<div><button class="btn ghost sm" onClick=${() => open(app)}>${isPlayed(f) ? "Ouvrir le match dans l’app" : "Voir la préparation du match"}</button></div>`
+              : store.readOnly ? null
+              : isPlayed(f) || (f.date && f.date <= today) ? html`<div><button class="btn primary sm" onClick=${() => open(createFromFixture(f))}>Créer ce match dans l’app pour la saisie</button></div>`
+              : html`<div><button class="btn primary sm" onClick=${() => open(createFromFixture(f))}><${Icon} name="grid" size=${15} />Préparer ce match (compo, consignes)</button></div>`}
           </div>`;
         })}
         ${prevVs.length ? html`<p class="small">Saison ${L.previous.season} : ${prevVs.map((m) => { const s = side(m, us); return `${s.won > s.lost ? "victoire" : "défaite"} ${s.won}–${s.lost} (${s.home ? "dom." : "ext."})`; }).join(" · ")}.</p>` : null}
@@ -309,5 +336,5 @@
     });
   }
 
-  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, Standings, TeamSheet, ordinal, nice };
+  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, fixtureInfo, Standings, TeamSheet, ordinal, nice };
 })(window);

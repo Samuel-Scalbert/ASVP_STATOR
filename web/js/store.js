@@ -7,7 +7,7 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 5;
+  const API_LEVEL = 6;
   const COLS = ["matches", "stats"];
 
   function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -291,6 +291,8 @@
   const q = {
     roster() { return (store.config && Array.isArray(store.config.roster)) ? store.config.roster : []; },
     active() { return q.roster().filter((p) => p.active !== false); },
+    /* Binômes : paires de joueurs aux profils proches, réglées dans l’onglet Équipe. */
+    pairs() { return (store.config && Array.isArray(store.config.pairs)) ? store.config.pairs : []; },
     name(id) { const p = q.roster().find((x) => x.id === id); return p ? p.name : "Joueur retiré"; },
     posteLabel(id) {
       const p = q.roster().find((x) => x.id === id);
