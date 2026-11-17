@@ -5,7 +5,7 @@
   const C = root.StatorCore;
   const { store, api, q, lsGet, lsSet } = root.StatorStore;
   const U = root.StatorUI;
-  const { Icon, RateChip, Meter, Recap, LevelLegend, DiffBar, cx, pct, signed, plural, fmtDate, fmtTime } = U;
+  const { Icon, RateChip, Meter, Recap, LevelLegend, DiffBar, cx, pct, signed, plural, fmtDate, fmtTime, TeamLogo } = U;
 
   const venueLabel = (v) => (v === "dom" ? "Domicile" : v === "ext" ? "Extérieur" : "");
   function ResultChip({ m }) {
@@ -89,9 +89,9 @@
         ${r ? html`<${ResultChip} m=${off ? { sets: off.sets } : m} />` : null}
       </div>
       <div class=${cx("board", !featured && "sm")}>
-        <span class="board-team">ASVP</span>
+        <span class="board-team"><${TeamLogo} name="ASVP" size=${featured ? 44 : 34} />ASVP</span>
         <span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span>
-        <span class="board-team opp">${m.opponent}</span>
+        <span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${featured ? 44 : 34} /></span>
       </div>
       <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
       <div class="hero-foot">
@@ -172,7 +172,7 @@
             : [fmtDate(e.date, { weekday: "long" }) + (e.time ? " " + fmtTime(e.time) : ""), venueLabel(m.venue), m.competition];
           return html`<li key=${e.key}><button type="button" class="next-row" onClick=${() => openEntry(e)}>
             <span class="next-date"><b>${Number(e.date.slice(8))}</b><small>${fmtDate(e.date, { month: "short" })}</small></span>
-            <span class="next-main"><b>${x ? x.opp : m.opponent}${x && x.rank ? html` <span class="rank-chip sm">${LG.ordinal(x.rank)}</span>` : null}</b><small>${detail.filter(Boolean).join(" · ")}</small></span>
+            <span class="next-main"><b><${TeamLogo} name=${x ? x.opp : m.opponent} size=${20} />${x ? x.opp : m.opponent}${x && x.rank ? html` <span class="rank-chip sm">${LG.ordinal(x.rank)}</span>` : null}</b><small>${detail.filter(Boolean).join(" · ")}</small></span>
             <span class="next-in">${soon(k)}</span>
           </button></li>`; })}</ul>`
           : html`<p class="muted small">Aucun match prévu. Ajoute le prochain : toute l’équipe verra la date.</p>`}
@@ -767,7 +767,7 @@
           <button class="icon-btn on-band" onClick=${() => go({ view: "home" })} aria-label="Retour aux matchs"><${Icon} name="back" /></button>
           <div class="mb-main">
             <span class="eyebrow on-band">${fmtDate(m.date)}${m.time ? " · " + fmtTime(m.time) : ""}${venueLabel(m.venue) ? " · " + venueLabel(m.venue) : ""}${m.competition ? " · " + m.competition : ""}</span>
-            <div class="board sm"><span class="board-team">ASVP</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}</span></div>
+            <div class="board sm"><span class="board-team"><${TeamLogo} name="ASVP" size=${36} />ASVP</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
             <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
             ${m.noData && html`<div class="board-sets"><${NoDataBadge} /></div>`}
             ${m.closed && !m.noData && html`<div class="board-sets"><${ClosedBadge} band /></div>`}

@@ -198,3 +198,13 @@ def test_lineup_templates(team):
         assert team.put("/api/config", json={"roster": roster, "templates": templates}).status_code == 400
     assert team.put("/api/config", json={"roster": roster, "templates": []}).status_code == 200
     assert team.get("/api/state").get_json()["config"]["templates"] == []
+
+
+def test_club_logos_are_small_webp_files(client):
+    from pathlib import Path
+    logos = sorted(Path(__file__).resolve().parent.parent.joinpath("web", "img", "clubs").glob("*.webp"))
+    assert logos, "aucun logo de club"
+    for logo in logos:
+        assert logo.stat().st_size < 8 * 1024, logo.name           # petits fichiers : peu de stockage sur le serveur
+        res = client.get("/img/clubs/" + logo.name)
+        assert res.status_code == 200 and res.mimetype == "image/webp", logo.name

@@ -8,7 +8,7 @@
   const C = root.StatorCore;
   const { store, api, q } = root.StatorStore;
   const U = root.StatorUI;
-  const { Icon, cx, plural, fmtDate, fmtTime } = U;
+  const { Icon, cx, plural, fmtDate, fmtTime, TeamLogo } = U;
 
   /* ---------- Calculs ---------- */
   const isPlayed = (m) => m.sets.length > 0;
@@ -136,7 +136,7 @@
     const w = s.won > s.lost;
     return html`<li class="tm-line">
       <span class="tl-when">${when(s.m)}<small>${s.home ? "Domicile" : "Extérieur"}</small></span>
-      <span class="tl-opp">${onTeam ? html`<button class="linkish" onClick=${() => onTeam(s.opp)}>${s.opp}</button>` : s.opp}</span>
+      <span class="tl-opp"><${TeamLogo} name=${s.opp} />${onTeam ? html`<button class="linkish" onClick=${() => onTeam(s.opp)}>${s.opp}</button>` : s.opp}</span>
       <span class=${cx("res", w ? "win" : "loss")}>${w ? "V" : "D"} ${s.won}–${s.lost}</span>
       <span class="tl-sets">${setsText(s.sets)}</span>
     </li>`;
@@ -154,7 +154,7 @@
       </tr></thead>
       <tbody>${rows.map((r) => html`<tr key=${r.team} class=${cx(r.team === us && "us")} onClick=${onTeam ? () => onTeam(r.team) : null}>
         <td class="st-rank">${r.rank}</td>
-        <td class="st-team">${onTeam ? html`<button class="linkish" onClick=${(e) => { e.stopPropagation(); onTeam(r.team); }}>${r.team}</button>` : r.team}${r.pen ? html`<small class="st-pen" title="Écart avec le barème : forfait ou pénalité">${r.pen > 0 ? "+" : ""}${r.pen} pt</small>` : null}</td>
+        <td class="st-team"><${TeamLogo} name=${r.team} />${onTeam ? html`<button class="linkish" onClick=${(e) => { e.stopPropagation(); onTeam(r.team); }}>${r.team}</button>` : r.team}${r.pen ? html`<small class="st-pen" title="Écart avec le barème : forfait ou pénalité">${r.pen > 0 ? "+" : ""}${r.pen} pt</small>` : null}</td>
         <td class="st-pts">${r.pts}</td><td>${r.j}</td><td>${r.v}</td><td>${r.d}</td><td>${r.sw}–${r.sl}</td>
         ${compact ? null : html`<td class="opt">${fmtRatio(r.sr)}</td><td class="opt">${r.pw}–${r.pl}</td><td class="opt">${fmtRatio(r.pr)}</td>
         <td><${Form} list=${r.form} /></td>`}
@@ -183,7 +183,7 @@
         const [h, a] = [side(m, m.home).won, side(m, m.away).won];
         return html`<li key=${m.code} class=${cx((m.home === L.team || m.away === L.team) && "us")}>
           <span class="rl-when">${when(m)}</span>
-          <span class="rl-teams"><button class="linkish" onClick=${() => onTeam(m.home)}>${m.home}</button><i>–</i><button class="linkish" onClick=${() => onTeam(m.away)}>${m.away}</button></span>
+          <span class="rl-teams"><${TeamLogo} name=${m.home} /><button class="linkish" onClick=${() => onTeam(m.home)}>${m.home}</button><i>–</i><${TeamLogo} name=${m.away} /><button class="linkish" onClick=${() => onTeam(m.away)}>${m.away}</button></span>
           <span class="rl-score">${isPlayed(m) ? html`<b>${h}–${a}</b><small>${setsText(m.sets)}</small>` : html`<small>${m.gym ? nice(m.gym) : ""}</small>`}</span>
         </li>`;
       })}</ul>
@@ -210,7 +210,7 @@
       </div>
       ${next && html`<section class="next-banner">
         <span class="eyebrow">Prochain match · ${when(next, { weekday: "long", day: "numeric", month: "long" })}</span>
-        <div class="nb-main"><b>${next.home} – ${next.away}</b>${oppRow ? html`<span class="rank-chip">${opp} : ${ordinal(oppRow.rank)} au classement</span>` : null}</div>
+        <div class="nb-main"><b><${TeamLogo} name=${next.home} size=${28} />${next.home} – <${TeamLogo} name=${next.away} size=${28} />${next.away}</b>${oppRow ? html`<span class="rank-chip">${opp} : ${ordinal(oppRow.rank)} au classement</span>` : null}</div>
         <button class="btn primary sm" onClick=${() => onTeam(opp)}>Fiche de l’adversaire</button>
       </section>`}
       <section class="card table-card">
@@ -275,6 +275,7 @@
     const open = (doc) => { if (go) go({ view: "match", matchId: doc.id }); };
     return html`<div class="team-sheet">
       <div class="tm-id">
+        <${TeamLogo} name=${team} size=${48} />
         ${info.club ? html`<span>Club : <b>${nice(info.club)}</b></span>` : null}
         ${info.colors ? html`<span>Maillot : <b>${info.colors.toLowerCase()}</b></span>` : null}
         ${info.site ? html`<a href=${info.site} target="_blank" rel="noopener noreferrer">Site du club</a>` : null}
@@ -318,7 +319,7 @@
       ${coming.length ? html`<section class="tm-block"><h3 class="h-sub">Prochains matchs</h3>
         <ul class="tm-lines">${coming.slice(0, 4).map((m) => { const s = side(m, team); return html`<li class="tm-line" key=${m.code}>
           <span class="tl-when">${when(m)}<small>${s.home ? "Domicile" : "Extérieur"}</small></span>
-          <span class="tl-opp"><button class="linkish" onClick=${() => onTeam(s.opp)}>${s.opp}</button></span>
+          <span class="tl-opp"><${TeamLogo} name=${s.opp} /><button class="linkish" onClick=${() => onTeam(s.opp)}>${s.opp}</button></span>
           <span class="tl-sets">${m.gym ? nice(m.gym) : ""}</span></li>`; })}</ul></section>` : null}
     </div>`;
   }

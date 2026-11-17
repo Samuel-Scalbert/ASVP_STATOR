@@ -254,6 +254,20 @@
     </svg>`;
   }
 
+  /* Logos des clubs de la poule (web/img/clubs : carrés de 64 px en WebP) ; sinon une pastille « no logo ».
+     La clé est le nom d’équipe sans espaces ni accents ; « PAC1 » et « PAC2 » partagent le logo du club. */
+  const CLUB_LOGOS = { ASVP: "asvp", PAC: "pac", SCNP: "scnp", SCUF: "scuf", SCPV: "scpv", VOLLEY6: "volley6", ASCDUNOIS: "dunois", DUNOIS: "dunois", VB14: "vb14" };
+  function logoKey(name) {
+    const k = String(name || "").normalize("NFD").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return CLUB_LOGOS[k] || CLUB_LOGOS[k.replace(/\d+$/, "")] || "";
+  }
+  function TeamLogo({ name, size }) {
+    const key = logoKey(name), s = size || 22;
+    return key
+      ? html`<img class="team-logo" src=${"img/clubs/" + key + ".webp"} width=${s} height=${s} alt="" loading="lazy" />`
+      : html`<span class="team-logo none" style=${"width:" + s + "px;height:" + s + "px;font-size:" + Math.max(6, Math.round(s * 0.27)) + "px"} aria-hidden="true">no logo</span>`;
+  }
+
   /* Version Excel différente de la saisie de l’app : le joueur (ou le coach) tranche. */
   function ExcelConflict({ excel, sets, bilan, who, onAccept, onKeep, disabled }) {
     if (!excel || excel.status !== "pending") return null;
@@ -302,5 +316,5 @@
     </span>`;
   }
 
-  root.StatorUI = { ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, fmtTime, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
+  root.StatorUI = { TeamLogo, ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, fmtTime, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
 })(window);

@@ -6,7 +6,7 @@
   const C = root.StatorCore;
   const { store, api, q } = root.StatorStore;
   const U = root.StatorUI;
-  const { Icon, cx, plural, fmtDate, fmtTime } = U;
+  const { Icon, cx, plural, fmtDate, fmtTime, TeamLogo } = U;
 
   /* ---------- Modèle ---------- */
   // Les six places du terrain, vues de notre fond : trois au filet, trois à l’arrière.
@@ -266,7 +266,7 @@
           <button class="icon-btn on-band" onClick=${() => go({ view: "home" })} aria-label="Retour aux matchs"><${Icon} name="back" /></button>
           <div class="mb-main">
             <span class="eyebrow on-band">Match à venir · ${k === 0 ? "aujourd’hui" : k === 1 ? "demain" : "J-" + k}${m.competition ? " · " + m.competition : ""}</span>
-            <div class="board sm"><span class="board-team">ASVP</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}</span></div>
+            <div class="board sm"><span class="board-team"><${TeamLogo} name="ASVP" size=${36} />ASVP</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
             <div class="up-when">
               <span class="up-date"><${Icon} name="cal" size=${18} />${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long" })}${m.time ? html` · <b>${fmtTime(m.time)}</b>` : html` · <i>heure à préciser</i>`}</span>
               <span class="up-warm"><${Icon} name="ball" size=${18} />Échauffement ${warm ? html`à <b>${fmtTime(warm)}</b>` : html`<b>1 h avant</b>`}</span>
@@ -299,7 +299,7 @@
             </dl>
           </section>
           ${info && info.rank ? html`<section class="card up-opp">
-            <div class="block-head"><h2 class="h-sec">L’adversaire</h2><span class="rank-chip">${LG.ordinal(info.rank)} sur ${info.teams}</span></div>
+            <div class="block-head"><h2 class="h-sec"><${TeamLogo} name=${m.opponent} size=${30} />L’adversaire</h2><span class="rank-chip">${LG.ordinal(info.rank)} sur ${info.teams}</span></div>
             <div class="tm-kpis">
               <div class="tm-kpi"><b>${info.pts}</b><small>${info.pts > 1 ? "points" : "point"} au classement</small></div>
               <div class="tm-kpi"><b>${info.v}–${info.d}</b><small>victoires – défaites</small></div>
