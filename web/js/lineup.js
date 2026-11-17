@@ -41,14 +41,19 @@
   const cloneLineup = (x) => ({ label: x.label || "", positions: Object.assign({}, x.positions || {}), libero: x.libero || "", pairs: (x.pairs || []).map((p) => p.slice()), comment: x.comment || "" });
 
   /* ---------- Terrain ---------- */
-  /* Une case du terrain : le poste en en-tête (couleur du poste), le nom du joueur. */
-  function Tile({ id, slot, libero, editor, players, lu, onPick }) {
+  /* Une case du terrain : le poste en en-tête (couleur du poste), le nom du joueur et son binôme. */
+  function Tile({ id, slot, libero, editor, players, lu, onPick, onPair }) {
     const poste = libero ? "libero" : posteOf(id);
     const head = libero ? "Libéro" : id ? (roleLabel(poste) || "Poste ?") : slot.label;
+    const partner = id ? partnerIn(lu, id) : "";
     if (editor) {
-      const taken = new Set(onCourt(lu).filter((x) => x !== id));
+      const on = onCourt(lu), taken = new Set(on.filter((x) => x !== id));
       const opts = libero ? [{ k: "", label: "", players: players.filter((p) => !taken.has(p.id)).map((p) => ({ id: p.id, name: p.name, poste: posteOf(p.id) })) }] : grouped(players);
-      return html`<label class=${cx("vb-pos edit", "pos-" + (poste || "none"), id && "set", libero && "lib")}>
+      // Binôme : un remplaçant qui n’est pas déjà en binôme, ceux du même poste en premier.
+      const paired = new Set([].concat.apply([], lu.pairs || []));
+      const candidates = players.filter((p) => !on.includes(p.id) && !paired.has(p.id))
+        .sort((x, y) => (posteOf(x.id) === poste ? 0 : 1) - (posteOf(y.id) === poste ? 0 : 1));
+      return html`<div class=${cx("vb-pos edit", "pos-" + (poste || "none"), id && "set", libero && "lib")}>
         <span class="vb-head">${head}</span>
         <select value=${id || ""} aria-label=${libero ? "Libéro" : "Joueur " + slot.label.toLowerCase()} onChange=${(e) => onPick(e.target.value)}>
           <option value="">— libre —</option>
@@ -56,24 +61,33 @@
             ? opts[0].players.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}</option>`)
             : opts.map((g) => html`<optgroup key=${g.k} label=${g.label}>${g.players.map((x) => html`<option key=${x.id} value=${x.id} disabled=${taken.has(x.id)}>${x.name}${taken.has(x.id) ? " (déjà placé)" : ""}</option>`)}</optgroup>`)}
         </select>
-      </label>`;
+        ${!id ? null : partner
+          ? html`<span class="vb-pair-chip" title="Binôme"><${Icon} name="swap" size=${13} /><span>${q.name(partner)}</span>
+              <button type="button" aria-label=${"Retirer le binôme " + q.name(partner)} onClick=${() => onPair(id, "")}><${Icon} name="x" size=${13} /></button></span>`
+          : candidates.length ? html`<select class="vb-pair-sel" value="" aria-label=${"Binôme de " + q.name(id)} onChange=${(e) => onPair(id, e.target.value)}>
+              <option value="">+ binôme</option>
+              ${candidates.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}${posteOf(x.id) ? " · " + roleLabel(posteOf(x.id)) : ""}</option>`)}
+            </select>` : null}
+      </div>`;
     }
     return html`<div class=${cx("vb-pos", "pos-" + (id ? poste || "none" : "empty"), libero && "lib")}>
       <span class="vb-head">${head}</span>
       <b class="vb-name">${id ? q.name(id) : "—"}</b>
-      ${id && partnerIn(lu, id) ? html`<small class="vb-pair"><${Icon} name="swap" size=${12} />${q.name(partnerIn(lu, id))}</small>` : null}
+      ${partner ? html`<small class="vb-pair" title="Binôme"><${Icon} name="swap" size=${12} />${q.name(partner)}</small>` : null}
     </div>`;
   }
-  function Court({ lu, editor, onPick, players }) {
-    const tile = (s) => html`<${Tile} key=${s.p} slot=${s} id=${lu.positions[s.p] || ""} editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick(s.p, id)} />`;
+  /* Le terrain vu de notre fond, filet en haut ; le libéro à côté, à la hauteur de la rangée arrière. */
+  function Court({ lu, editor, onPick, onPair, players }) {
+    const tile = (s) => html`<${Tile} key=${s.p} slot=${s} id=${lu.positions[s.p] || ""} editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick(s.p, id)} onPair=${onPair} />`;
     return html`<div class="vb-wrap">
       <div class="vb-court" role="group" aria-label="Terrain">
         <div class="vb-net"><span>Filet</span></div>
         <div class="vb-row">${SLOTS.filter((s) => s.row === "front").map(tile)}</div>
         <div class="vb-attack"><span>3 m</span></div>
-        <div class="vb-row">${SLOTS.filter((s) => s.row === "back").map(tile)}</div>
+        <div class="vb-row back">${SLOTS.filter((s) => s.row === "back").map(tile)}
+          <div class="vb-libero"><${Tile} slot=${{ label: "Libéro" }} id=${lu.libero || ""} libero editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick("libero", id)} onPair=${onPair} /></div>
+        </div>
       </div>
-      <div class="vb-libero"><${Tile} slot=${{ label: "Libéro" }} id=${lu.libero || ""} libero editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick("libero", id)} /></div>
     </div>`;
   }
   function Bench({ lu, players }) {
@@ -84,36 +98,12 @@
       <ul>${list.map((p) => html`<li key=${p.id} class=${"pos-" + (p.poste || "none")}><span class="vb-dot"></span><b>${p.name}</b><small>${roleLabel(p.poste) || ""}</small>${p.partner ? html`<span class="vb-pair" title="Binôme"><${Icon} name="swap" size=${13} />${q.name(p.partner)}</span>` : null}</li>`)}</ul>
     </div>`;
   }
-  function Pairs({ lu }) {
-    if (!(lu.pairs || []).length) return null;
-    return html`<div class="vb-pairs"><span class="eyebrow">Binômes</span>
-      <ul>${lu.pairs.map(([a, b]) => html`<li key=${a + b}><b>${q.name(a)}</b><${Icon} name="swap" size=${14} /><b>${q.name(b)}</b></li>`)}</ul></div>`;
-  }
-  /* Une compo en lecture : terrain, commentaire, remplaçants et binômes. */
+  /* Une compo en lecture : terrain (avec les binômes), commentaire, remplaçants. */
   function LineupView({ lu, players }) {
     return html`<div class="vb-view">
       <${Court} lu=${lu} players=${players} />
       ${lu.comment ? html`<p class="vb-comment"><${Icon} name="info" size=${16} /><span>${lu.comment}</span></p>` : null}
-      <div class="vb-aside"><${Bench} lu=${lu} players=${players} /><${Pairs} lu=${lu} /></div>
-    </div>`;
-  }
-
-  /* ---------- Binômes (dans l’éditeur de compo) ---------- */
-  function PairsEditor({ lu, players, update }) {
-    const [pa, setPa] = useState("");
-    const [pb, setPb] = useState("");
-    const paired = new Set([].concat.apply([], lu.pairs || []));
-    const free = players.filter((p) => !paired.has(p.id));
-    const add = () => { if (!pa || !pb || pa === pb) return; update({ pairs: (lu.pairs || []).concat([[pa, pb]]) }); setPa(""); setPb(""); };
-    const opt = (p) => html`<option key=${p.id} value=${p.id}>${p.name}${posteOf(p.id) ? " · " + roleLabel(posteOf(p.id)) : ""}</option>`;
-    return html`<div class="field"><span class="lbl"><b>Binômes</b><small>deux joueurs aux profils proches : l’un remplace l’autre</small></span>
-      ${(lu.pairs || []).length ? html`<ul class="pairs">${lu.pairs.map(([a, b], i) => html`<li key=${a + b}><b>${q.name(a)}</b><${Icon} name="swap" size=${16} /><b>${q.name(b)}</b>
-        <button type="button" class="icon-btn" aria-label=${"Défaire le binôme " + q.name(a) + " – " + q.name(b)} onClick=${() => update({ pairs: (lu.pairs || []).filter((_, j) => j !== i) })}><${Icon} name="x" size=${16} /></button></li>`)}</ul>` : null}
-      ${free.length >= 2 ? html`<div class="add-row">
-        <select aria-label="Premier joueur du binôme" value=${pa} onChange=${(e) => setPa(e.target.value)}><option value="">Joueur…</option>${free.map(opt)}</select>
-        <select aria-label="Second joueur du binôme" value=${pb} onChange=${(e) => setPb(e.target.value)}><option value="">avec…</option>${free.filter((p) => p.id !== pa).map(opt)}</select>
-        <button type="button" class="btn ghost sm" disabled=${!pa || !pb} onClick=${add}><${Icon} name="swap" size=${16} />Former</button>
-      </div>` : null}
+      <${Bench} lu=${lu} players=${players} />
     </div>`;
   }
 
@@ -135,6 +125,12 @@
       if (id) positions[p] = id; else delete positions[p];
       update({ positions });
     };
+    // Binôme d’un joueur du terrain : on le remplace (other) ou on le retire (other vide).
+    const pair = (id, other) => setLineups((prev) => prev.map((x, i) => {
+      if (i !== cur) return x;
+      const pairs = (x.pairs || []).filter((pr) => !pr.includes(id) && !(other && pr.includes(other)));
+      return Object.assign({}, x, { pairs: other ? pairs.concat([[id, other]]) : pairs });
+    }));
     const apply = (tpl) => { if (tpl) update({ positions: Object.assign({}, tpl.positions), libero: tpl.libero || "", pairs: (tpl.pairs || []).map((x) => x.slice()), comment: lu.comment || tpl.comment || "" }); };
     const add = () => { if (lineups.length < 4) { setLineups(lineups.concat([emptyLineup("Set " + (lineups.length + 1))])); setCur(lineups.length); } };
     const remove = () => { const next = lineups.filter((_, i) => i !== cur); setLineups(next.length ? next : [emptyLineup("Set 1")]); setCur(0); };
@@ -176,9 +172,8 @@
               <button type="button" class="btn ghost sm" disabled=${!tplChoice} onClick=${() => { apply(templates.find((t) => t.id === tplChoice)); U.toast("Compo type appliquée."); }}>Appliquer</button>
             </div></div>
         </div>`}
-      <p class="muted small">Place les six joueurs sur le terrain et le libéro à côté : les listes sont rangées par poste.</p>
-      <${Court} lu=${lu} editor players=${players} onPick=${pick} />
-      <${PairsEditor} lu=${lu} players=${players} update=${update} />
+      <p class="muted small">Place les six joueurs sur le terrain et le libéro à côté (les listes sont rangées par poste). « + binôme » sous un joueur lui associe un remplaçant au profil proche.</p>
+      <${Court} lu=${lu} editor players=${players} onPick=${pick} onPair=${pair} />
       <div class="field"><label for="lu-comment"><b>Commentaire du coach</b><small>sur cette compo</small></label>
         <textarea id="lu-comment" rows="3" maxlength="1000" value=${lu.comment || ""} onInput=${(e) => update({ comment: e.target.value })} placeholder="ex. Kévin et Lucas permutent si la réception souffre"></textarea></div>
       ${!isTemplate && html`<div class="field lu-saveas"><span class="lbl"><b>Garder cette compo comme compo type</b><small>pour la réutiliser sur d’autres matchs</small></span>

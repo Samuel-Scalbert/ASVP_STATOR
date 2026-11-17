@@ -24,22 +24,17 @@
     const ps = q.playersOf(matchId);
     return { done: ps.filter((p) => C.isFilled(p.doc)).length, total: ps.length, ps };
   }
-  /* Avancement des saisies : complet (tout le monde a saisi, ou match marqué terminé), retardataires à nommer quand il manque 30 % au plus. */
+  /* Avancement des saisies : complet quand tout le monde a saisi, ou quand le match est marqué terminé. */
   function progressOf(m, comp) {
     const pct = comp.total ? Math.round((100 * comp.done) / comp.total) : 0;
     const complete = !m.noData && (m.closed || (comp.total > 0 && comp.done === comp.total));
-    const missing = comp.ps.filter((p) => !C.isFilled(p.doc)).map((p) => p.name);
-    return { pct, complete, missing, nearly: !complete && !m.noData && comp.total > 0 && comp.done / comp.total >= 0.7 };
+    return { pct, complete };
   }
   function ProgressBar({ pr, comp }) {
     return html`<div class=${cx("prog", pr.complete && "complete")} role="progressbar" aria-valuenow=${pr.pct} aria-valuemin="0" aria-valuemax="100" aria-label="Fiches remplies">
       <div class="prog-bar"><i style=${"width:" + (pr.complete ? 100 : pr.pct) + "%"}></i></div>
       <span class="prog-txt">${pr.complete ? html`<${Icon} name="check" size=${14} />Complet` : comp.done + "/" + comp.total + " fiches · " + pr.pct + " %"}</span>
     </div>`;
-  }
-  function MissingBubble({ pr }) {
-    if (!pr.nearly) return null;
-    return html`<div class="miss-bubble" role="status"><span class="miss-dot">${pr.missing.length}</span><span><b>${pr.missing.length > 1 ? "Il manque encore" : "Il manque encore la fiche de"}</b> ${pr.missing.join(", ")}</span></div>`;
   }
 
   /* ---------- Choix du joueur ---------- */
@@ -107,7 +102,6 @@
             : m.closed ? html`<span><${ClosedBadge} band /> ${U.plural(comp.done, "fiche remplie", "fiches remplies")}</span>`
             : html`${state ? html`<span>Ta fiche : <b>${state}</b></span>` : out ? html`<span>Tu n’es pas dans les joueurs de ce match</span>` : null}<span>${comp.done}/${comp.total} joueurs ont saisi</span>`}
         </div>
-        <${MissingBubble} pr=${pr} />
         ${conflicts.length ? html`<div class="hero-alert" role="alert"><span class="alert-badge">ATTENTION</span>${conflicts.length > 1 ? conflicts.length + " fiches diffèrent" : "1 fiche diffère"} de l’Excel du coach : différences non résolues (${conflicts.map((d) => q.name(d.playerId)).join(", ")}).</div>` : null}
         <div class="hero-actions">
           ${!store.readOnly && !m.noData && !m.closed && !out && html`<button class=${cx("btn primary", !featured && "sm")} onClick=${() => go(entryRoute(m, me))}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
@@ -516,7 +510,6 @@
     return html`<section class="card">
       <div class="block-head"><h2 class="h-sec">Saisies</h2><span class="muted">${comp.done} sur ${comp.total} joueurs</span></div>
       <${ProgressBar} pr=${pr} comp=${comp} />
-      <${MissingBubble} pr=${pr} />
       <div class="chips">
         ${comp.ps.map((p) => html`<span key=${p.id} class=${cx("chip", C.isFilled(p.doc) ? "done" : "todo", p.doc && p.doc.excel && p.doc.excel.status === "pending" && "alert")}>
           ${C.isFilled(p.doc) && html`<${Icon} name="check" size=${13} />`}${p.name}</span>`)}
