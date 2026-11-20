@@ -253,6 +253,20 @@
     </section>`;
   }
   const hasPrep = (m) => !!((m.lineups && m.lineups.length) || (m.consignes && m.consignes.length));
+  /* Consignes et compo sur la page d’un match joué (ou du jour) : en tête, sur tous les onglets, pour toujours.
+     Le jour du match, les consignes restent en grand comme sur la page de préparation. */
+  function PrepBlock({ m, openSheet }) {
+    const today = m.date === C.todayIso();
+    const has = hasPrep(m);
+    if (!has && store.readOnly) return null;
+    return html`<details class="card prep-wrap" open=${has || today}>
+      <summary>${today ? "Le plan du coach pour aujourd’hui" : "Préparation du match"}<small>${has ? "consignes et compo du coach" : "pas encore de consignes ni de compo"}</small></summary>
+      <div class="prep-inner two">
+        <${ConsignesCard} m=${m} openSheet=${openSheet} prominent=${today} />
+        <${LineupCard} m=${m} openSheet=${openSheet} compact />
+      </div>
+    </details>`;
+  }
   /* Binôme d’un joueur dans les compos d’un match (pour la liste des convoqués). */
   function partnerOf(m, id) {
     for (const lu of m.lineups || []) { const p = partnerIn(lu, id); if (p) return p; }
@@ -333,5 +347,5 @@
     </div>`;
   }
 
-  root.StatorPrep = { Court, LineupView, LineupEditor, LineupCard, ConsignesCard, ConsignesEditor, ConsignesView, Upcoming, hasPrep, warmup, roleLabel };
+  root.StatorPrep = { Court, LineupView, LineupEditor, LineupCard, ConsignesCard, ConsignesEditor, ConsignesView, PrepBlock, Upcoming, hasPrep, warmup, roleLabel };
 })(window);

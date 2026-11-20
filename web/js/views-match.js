@@ -85,7 +85,7 @@
     const pr = progressOf(m, comp);
     return html`<section class=${cx("hero", pr.complete && "complete")}>
       <div class="hero-top">
-        <span class="eyebrow on-band">${featured ? "Dernier match · " : ""}${fmtDate(m.date)}${where ? " · " + where : ""}</span>
+        <span class="eyebrow on-band">${m.date === C.todayIso() ? "Aujourd’hui · " : featured ? "Dernier match · " : ""}${fmtDate(m.date)}${where ? " · " + where : ""}</span>
         ${r ? html`<${ResultChip} m=${off ? { sets: off.sets } : m} />` : null}
       </div>
       <div class=${cx("board", !featured && "sm")}>
@@ -106,6 +106,7 @@
         <div class="hero-actions">
           ${!store.readOnly && !m.noData && !m.closed && !out && html`<button class=${cx("btn primary", !featured && "sm")} onClick=${() => go(entryRoute(m, me))}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
           <button class=${cx("btn on-band-ghost", !featured && "sm")} onClick=${() => go({ view: "match", matchId: m.id })}>Voir le match</button>
+          ${root.StatorPrep.hasPrep(m) ? html`<button class=${cx("btn on-band-ghost", !featured && "sm")} onClick=${() => go({ view: "match", matchId: m.id })}><${Icon} name="flag" size=${16} />Consignes et compo</button>` : null}
         </div>
       </div>
     </section>`;
@@ -127,7 +128,8 @@
     const byDay = {};
     q.matchList().forEach((m) => { if (m.date && !byDay[m.date]) byDay[m.date] = { m }; });
     fixtures.forEach((x) => { if (!byDay[x.f.date]) byDay[x.f.date] = { x }; });
-    const next = q.upcoming().map((m) => ({ key: m.id, date: m.date, time: m.time || "", m }))
+    const todays = q.played().filter((m) => m.date === today && !C.matchResult(m)); // match du jour : il reste dans « À venir »
+    const next = todays.concat(q.upcoming()).map((m) => ({ key: m.id, date: m.date, time: m.time || "", m }))
       .concat(fixtures.filter((x) => x.upcoming).map((x) => ({ key: x.f.code, date: x.f.date, time: x.f.time, x })))
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     const lead = (new Date(cur.y, cur.mo, 1).getDay() + 6) % 7; // semaines du lundi au dimanche
@@ -599,10 +601,6 @@
         <div class="chips">${conf.map((d) => html`<button key=${d.id} class="chip alert" onClick=${() => openSheet({ type: "player", p: { id: d.playerId, name: q.name(d.playerId) }, m })}>${q.name(d.playerId)}</button>`)}</div>
       </section>` : null}
       <${Completion} comp=${comp} me=${me} m=${m} go=${go} />
-      <details class="card prep-wrap" open=${root.StatorPrep.hasPrep(m)}>
-        <summary>Préparation du match<small>${root.StatorPrep.hasPrep(m) ? "compo et consignes du coach" : "compo, consignes"}</small></summary>
-        <div class="prep-inner"><${root.StatorPrep.ConsignesCard} m=${m} openSheet=${openSheet} /><${root.StatorPrep.LineupCard} m=${m} openSheet=${openSheet} compact /></div>
-      </details>
       <section class="card">
         <h2 class="h-sec">L’équipe sur ce match</h2>
         <div class="kpis">
@@ -789,6 +787,7 @@
         </div>`}
       </section>
       <div class="page wide">
+        <${root.StatorPrep.PrepBlock} m=${m} openSheet=${openSheet} />
         ${m.noData ? html`<${NoDataPanel} m=${m} openSheet=${openSheet} />`
           : sub === "joueurs" ? html`<${Players} m=${m} openSheet=${openSheet} />` : sub === "bilans" ? html`<${Bilans} m=${m} />` : html`<${Summary} m=${m} me=${me} go=${go} openSheet=${openSheet} />`}
       </div>

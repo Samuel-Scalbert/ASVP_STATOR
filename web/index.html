@@ -418,6 +418,7 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .prep-wrap summary small { font-family: var(--font-body); font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
 .prep-inner { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .prep-inner .card { background: var(--surface-2); }
+.prep-inner.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
 /* Avancement des saisies : barre, état complet, retardataires. */
 .prog { display: flex; align-items: center; gap: 10px; }
 .prog-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--band-wash); overflow: hidden; }
