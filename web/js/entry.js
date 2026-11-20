@@ -28,13 +28,13 @@
     const rows = [];
     s.fields.forEach((f) => { if (f.p && rows.indexOf(f.o) < 0) rows.push(f.o); });
     const extras = s.fields.filter((f) => !f.p);
-    return html`<div class="matrix">
-      <div class="mx-head"><span></span>${C.POSTES.map((p) => html`<span key=${p.n}><b>${p.label}</b><small>${p.sub}</small></span>`)}</div>
+    return html`<div class=${cx("matrix", s.postes.length > 3 && "wide")} style=${"--mx-cols:" + s.postes.length}>
+      <div class="mx-head"><span></span>${s.postes.map((p) => html`<span key=${p.n}><b>${p.label}</b><small>${p.sub}</small></span>`)}</div>
       ${rows.map((o) => {
         const oc = s.outcomes[o];
         return html`<div class="mx-row" key=${o}>
           <div class=${"mx-lbl l" + oc.lvl}><b>${oc.label}${oc.pt ? html` <span class=${cx("tile-pt inline", oc.pt > 0 ? "plus" : "minus")}>${oc.pt > 0 ? "+1 pt" : "−1 pt"}</span>` : null}</b><small>${oc.hint}</small></div>
-          ${C.POSTES.map((p) => tile(s.fields.find((x) => x.o === o && x.p === p.n), true))}
+          ${s.postes.map((p) => tile(s.fields.find((x) => x.o === o && x.p === p.n), true))}
         </div>`;
       })}
       <div class=${"pad c" + extras.length}>${extras.map((f) => tile(f, false))}</div>

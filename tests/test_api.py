@@ -208,3 +208,12 @@ def test_club_logos_are_small_webp_files(client):
         assert logo.stat().st_size < 8 * 1024, logo.name           # petits fichiers : peu de stockage sur le serveur
         res = client.get("/img/clubs/" + logo.name)
         assert res.status_code == 200 and res.mimetype == "image/webp", logo.name
+
+
+def test_passes_to_back_row_positions(team):
+    """Les passes se notent aussi vers les postes 6 et 1 (attaque de l'arrière)."""
+    ref = team.get("/referentiel.json").get_json()
+    assert [p["n"] for p in ref["court_positions"]] == [4, 3, 2, 6, 1]
+    fiche = dict(FICHE, sets={"1": {"passe": {"reussie_p6": 2, "reussie_p1": 1, "moyenne_p1": 1, "reussie_p3": 4}}})
+    assert team.put("/api/stats/m-exemple__joueur-a", json=fiche).status_code == 200
+    assert team.get("/api/state").get_json()["stats"]["m-exemple__joueur-a"]["sets"] == fiche["sets"]

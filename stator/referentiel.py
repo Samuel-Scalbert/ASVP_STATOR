@@ -13,9 +13,12 @@ def load() -> dict:
     """Le référentiel, avec les postes propres à l'équipe servie (voir teams.py) : les gestes et les stats
     sont les mêmes pour toutes les équipes."""
     ref = json.loads(Path(current_app.config["REFERENTIEL_PATH"]).read_text(encoding="utf-8"))
-    roles = (current_app.config.get("STATOR_TEAM") or {}).get("roles")
-    if roles:
-        ref["roles"] = roles
+    team = current_app.config.get("STATOR_TEAM") or {}
+    if team.get("roles"):
+        ref["roles"] = team["roles"]
+    if team.get("court_positions"):
+        # Seules les colonnes de la grille de saisie changent : les stats restent les mêmes pour toutes les équipes.
+        ref["court_positions"] = [p for p in ref["court_positions"] if p["n"] in team["court_positions"]]
     return ref
 
 

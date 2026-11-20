@@ -44,6 +44,16 @@
       "n": 2,
       "label": "Poste 2",
       "sub": "aile droite"
+    },
+    {
+      "n": 6,
+      "label": "Poste 6",
+      "sub": "arrière centre"
+    },
+    {
+      "n": 1,
+      "label": "Poste 1",
+      "sub": "arrière droit"
     }
   ],
   "skills": [
@@ -279,6 +289,18 @@
           "excel_row": 18
         },
         {
+          "key": "reussie_p6",
+          "outcome": "reussie",
+          "court_position": 6,
+          "excel_row": null
+        },
+        {
+          "key": "reussie_p1",
+          "outcome": "reussie",
+          "court_position": 1,
+          "excel_row": null
+        },
+        {
           "key": "moyenne_p2",
           "outcome": "moyenne",
           "court_position": 2,
@@ -295,6 +317,18 @@
           "outcome": "moyenne",
           "court_position": 4,
           "excel_row": 21
+        },
+        {
+          "key": "moyenne_p6",
+          "outcome": "moyenne",
+          "court_position": 6,
+          "excel_row": null
+        },
+        {
+          "key": "moyenne_p1",
+          "outcome": "moyenne",
+          "court_position": 1,
+          "excel_row": null
         },
         {
           "key": "erreur",

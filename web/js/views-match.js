@@ -414,9 +414,9 @@
       const doc = q.doc(m.id, pid);
       let kind;
       if (!doc || !C.isFilled(doc)) kind = "new";
-      else if (C.sameSets(doc.sets, p.sets)) kind = "same";
+      else if (C.sameExcelSets(doc.sets, p.sets)) kind = "same";
       else if (doc.source === "excel") kind = "update";
-      else if (doc.excel && doc.excel.status === "refused" && C.sameSets(doc.excel.sets, p.sets)) kind = "refused";
+      else if (doc.excel && doc.excel.status === "refused" && C.sameExcelSets(doc.excel.sets, p.sets)) kind = "refused";
       else kind = "conflict";
       return { p, pid, doc, kind, unknown: !autoId(p) };
     });
@@ -430,7 +430,7 @@
         if (r.kind === "ignore" || r.kind === "refused") return;
         const id = C.statId(m.id, r.pid);
         if (r.kind === "new" || r.kind === "update") {
-          api.saveStats({ id, matchId: m.id, playerId: r.pid, sets: C.clone(r.p.sets), bilan: C.clone(r.p.bilan), source: "excel", excel: null, updatedAt: now }, true);
+          api.saveStats({ id, matchId: m.id, playerId: r.pid, sets: C.withAppOnly(r.p.sets, r.doc && r.doc.sets), bilan: C.clone(r.p.bilan), source: "excel", excel: null, updatedAt: now }, true);
         } else if (r.kind === "same") {
           // Mêmes chiffres : on complète seulement les bilans vides.
           const next = C.clone(r.doc);
@@ -489,7 +489,7 @@
           <div class="def-h"><b>${oc.label}</b>${oc.pt ? html`<span class=${cx("tile-pt inline", oc.pt > 0 ? "plus" : "minus")}>${oc.pt > 0 ? "+1 point marqué" : "−1 faute"}</span>` : null}</div>
           <p>${oc.def}</p></li>`; })}
       </ul>
-      ${s.hasPostes && html`<div class="help-court"><p><b>Postes :</b> on note à quel poste la passe est destinée (ou d’où part l’attaque).</p><${U.Court} /></div>`}
+      ${s.hasPostes && html`<div class="help-court"><p><b>Postes :</b> on note à quel poste la passe est destinée (4, 3, 2, 6 ou 1) ou d’où part l’attaque (4, 3 ou 2).</p><${U.Court} /></div>`}
       <p class="help-rate"><b>Taux de transformation :</b> ${s.rateText}.</p>
     </div>`;
   }

@@ -299,7 +299,7 @@
   function resolveExcel(doc, accept) {
     const next = C.clone(doc);
     if (accept) {
-      next.sets = C.clone(doc.excel.sets) || {};
+      next.sets = C.withAppOnly(doc.excel.sets, doc.sets); // garde les passes en 6 et 1, absentes de l’Excel
       const eb = doc.excel.bilan || {};
       next.bilan = Object.assign({ pp: "", pm: "", cp: "", cm: "" }, next.bilan);
       ["pp", "pm", "cp", "cm"].forEach((k) => { if ((eb[k] || "").trim()) next.bilan[k] = eb[k]; });

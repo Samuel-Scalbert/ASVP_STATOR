@@ -22,6 +22,7 @@ TEAMS: dict[str, dict] = {
         "logo": "img/logo-asvp.png",
         "icons": True,                # icônes PNG de l'app installée sur téléphone (img/icon-*.png)
         "roles": None,                # postes du référentiel (web/referentiel.json) tels quels
+        "court_positions": None,      # zones du terrain du référentiel telles quelles (passes en 4, 3, 2, 6, 1)
         "css": None,                  # couleurs du logo de l'ASVP (index.html)
         "theme_color": "#0b1526",     # barre du navigateur sur téléphone
     },
@@ -45,6 +46,8 @@ TEAMS: dict[str, dict] = {
             {"key": "central", "label": "Centrale"},
             {"key": "pointu", "label": "Pointue"},
         ],
+        # Losange : pas de poste 6. Les passes se notent en 4, 3, 2 et 1.
+        "court_positions": [4, 3, 2, 1],
         # Thème de l'équipe (#00aaff, #00f7ff, #ffd447) : bandeaux, boutons, menu, terrain, en clair et en sombre.
         "css": "css/team-f4.css",
         "theme_color": "#00aaff",

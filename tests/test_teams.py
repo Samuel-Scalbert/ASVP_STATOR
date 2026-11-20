@@ -37,6 +37,7 @@ def test_4x4_roles_and_lineups(team):
     roles = [r["key"] for r in team.get("/f4/referentiel.json").get_json()["roles"]]
     assert "libero" not in roles and roles[0] == "passeur"
     assert "libero" in [r["key"] for r in team.get("/referentiel.json").get_json()["roles"]]
+    assert [p["n"] for p in team.get("/f4/referentiel.json").get_json()["court_positions"]] == [4, 3, 2, 1]  # pas de 6
     assert team.put("/f4/api/config", json={"roster": [{"id": "x", "name": "X", "poste": "libero"}]}).status_code == 400
     girls(team)
     team.put("/f4/api/matches/m-f4", json={"opponent": "Adversaire 4x4"})

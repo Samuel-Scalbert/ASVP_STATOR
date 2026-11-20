@@ -167,7 +167,7 @@
                   <div class="def-h"><b>${oc.label}</b>${oc.pt ? html`<span class=${cx("tile-pt inline", oc.pt > 0 ? "plus" : "minus")}>${oc.pt > 0 ? "+1 pt" : "−1 pt"}</span>` : null}</div><p>${oc.def}</p></li>`; })}</ul>
               </div>`)}
             </div>
-            <div class="help-court"><p><b>Passes et attaques par poste.</b> Pour ces deux gestes, on note aussi le poste : celui que sert la passe, ou celui d’où part l’attaque. Vu de l’arrière du terrain, le poste 4 est à gauche au filet, le 3 au centre, le 2 à droite.</p><${U.Court} /></div>
+            <div class="help-court"><p><b>Passes et attaques par poste.</b> Pour ces deux gestes, on note aussi le poste : celui que sert la passe (4, 3, 2, ou 6 et 1 pour une attaque de l’arrière), ou celui d’où part l’attaque. Vu de l’arrière du terrain, le poste 4 est à gauche au filet, le 3 au centre, le 2 à droite ; au fond, le 6 au centre et le 1 à droite.</p><${U.Court} /></div>
           </section>
 
           <section class="card" id="tuto-calculs">
@@ -195,7 +195,7 @@
             </table></div>
             <${Formula} label="Sur un match ou une saison" expr="Total des gestes réussis ÷ total des gestes, tous sets confondus"
               example="Réception : set 1 → 1 réussie sur 1 (100 %), set 2 → 6 sur 12 (50 %). Sur le match : 7 ÷ 13 = 54 %. La moyenne des deux sets donnerait 75 %, comme si une seule réception pesait autant que douze." />
-            <p class="muted small">Pour les passes et les attaques, les postes 2, 3 et 4 sont comptés séparément mais additionnés dans le taux.</p>
+            <p class="muted small">Pour les passes (postes 4, 3, 2, 6 et 1) et les attaques (postes 4, 3 et 2), chaque poste est compté séparément mais tous sont additionnés dans le taux. Les passes en 6 et 1 n’ont pas de ligne dans l’Excel du coach : elles restent dans l’app.</p>
 
             <h3 class="h-calc">Score et stats</h3>
             <${Formula} label="Points venus des fautes adverses (ou non saisis)" expr=${"Score " + (C.TEAM.key === "asvp" ? "de l’ASVP" : "de l’équipe") + " dans le set − points marqués saisis"}

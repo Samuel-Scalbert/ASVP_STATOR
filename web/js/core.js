@@ -31,6 +31,9 @@
       sk.hasPostes = sk.fields.some((f) => f.p);
       return sk;
     });
+    /* Postes de chaque geste (colonnes de la grille de saisie) : ceux du terrain que ses stats utilisent.
+       Les passes vont en 4, 3, 2, 6 et 1 ; les attaques partent de 4, 3 et 2. */
+    SKILLS.forEach((sk) => { sk.postes = POSTES.filter((p) => sk.fields.some((f) => f.p === p.n)); });
     SKILL = {};
     SKILLS.forEach((s) => { SKILL[s.key] = s; });
   }
@@ -110,11 +113,38 @@
     return parts.join(";");
   }
   const sameSets = (a, b) => canonSets(a) === canonSets(b);
+  /* Les stats sans ligne dans l’Excel du coach (passes en poste 6 et 1) n’y figurent pas : une fiche Excel
+     se compare donc à la saisie de l’app sur les seules stats de l’Excel, et ne les efface pas. */
+  function excelPart(sets) {
+    const out = {};
+    for (let n = 1; n <= MAX_SETS; n++) {
+      const set = sets && sets[n];
+      SKILLS.forEach((s) => s.fields.forEach((f) => {
+        const v = setVal(set, s.key, f.k);
+        if (v && f.row) ((out[n] = out[n] || {})[s.key] = out[n][s.key] || {})[f.k] = v;
+      }));
+    }
+    return out;
+  }
+  const sameExcelSets = (app, excel) => canonSets(excelPart(app)) === canonSets(excelPart(excel));
+  /* Comptages de l’Excel, complétés des stats que seule l’app connaît. */
+  function withAppOnly(excel, app) {
+    const out = clone(excel) || {};
+    for (let n = 1; n <= MAX_SETS; n++) {
+      const set = app && app[n];
+      SKILLS.forEach((s) => s.fields.forEach((f) => {
+        const v = setVal(set, s.key, f.k);
+        if (v && !f.row) ((out[n] = out[n] || {})[s.key] = out[n][s.key] || {})[f.k] = v;
+      }));
+    }
+    return out;
+  }
   /* Différences case par case entre la saisie de l’app et la version de l’Excel. */
   function diffSets(app, excel) {
     const out = [];
     for (let n = 1; n <= MAX_SETS; n++) {
       SKILLS.forEach((s) => s.fields.forEach((f) => {
+        if (!f.row) return;
         const a = setVal(app && app[n], s.key, f.k), e = setVal(excel && excel[n], s.key, f.k);
         if (a !== e) out.push({ set: n, label: s.label + " " + f.label.toLowerCase() + (f.p ? " P" + f.p : ""), app: a, excel: e });
       }));
@@ -506,7 +536,7 @@
   const api = {
     MAX_SETS, SET_COLS, setReferential, TEAM, g,
     norm, slug, uid, todayIso, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
-    canonSets, sameSets, diffSets,
+    canonSets, sameSets, sameExcelSets, withAppOnly, diffSets,
     opponentLine, matchSets, matchResult, matchSetCount, seasonOf,
     parseWorkbookData, playerSheetSpec, playerExportSpec, matchWorkbookSpec, seasonWorkbookSpec,
   };

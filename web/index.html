@@ -540,7 +540,7 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 @keyframes pop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
 .tile.has .tile-n { animation: pop 0.18s ease-out; }
 .matrix { display: flex; flex-direction: column; gap: 8px; }
-.mx-head, .mx-row { display: grid; grid-template-columns: minmax(84px, 1.1fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.mx-head, .mx-row { display: grid; grid-template-columns: minmax(84px, 1.1fr) repeat(var(--mx-cols, 3), minmax(0, 1fr)); gap: 8px; align-items: stretch; }
 .mx-head span { display: flex; flex-direction: column; align-items: center; font-size: 12.5px; line-height: 1.15; }
 .mx-head small { color: var(--muted); font-size: 11px; }
 .mx-lbl { display: flex; flex-direction: column; justify-content: center; padding-left: 9px; border-left: 4px solid; min-width: 0; }
@@ -816,6 +816,11 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
   .tile { min-height: 78px; }
 }
 @media (max-width: 420px) {
+  /* Grille des passes (5 postes) : le libellé passe au-dessus des cases, qui prennent toute la largeur. */
+  .matrix.wide .mx-head, .matrix.wide .mx-row { grid-template-columns: repeat(var(--mx-cols), minmax(0, 1fr)); gap: 6px; }
+  .matrix.wide .mx-head > span:first-child { display: none; }
+  .matrix.wide .mx-head small { font-size: 10px; }
+  .matrix.wide .mx-lbl { grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; align-items: baseline; gap: 8px; }
   .tile-hit { padding: 7px 8px 7px 11px; }
   .tile-h { font-size: 11.5px; }
   .tile-n { font-size: 28px; }
