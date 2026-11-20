@@ -14,6 +14,22 @@ terrain (une couleur par poste, libéro, binômes, remplaçants, compos types r�
 pratiques (échauffement une heure avant, salle, itinéraire, maillots). Sur l'accueil, une barre suit les
 fiches remplies ; un match complet s'affiche en vert.
 
+## Deux équipes, un coach
+
+La même app sert aussi l'équipe féminine 4x4 du coach, à l'adresse `/f4/` (en local :
+http://127.0.0.1:5000/f4/). Chaque équipe a sa propre base (`instance/stator.db` pour l'ASVP,
+`instance/stator-f4.db` pour le 4x4) : effectif, matchs et fiches ne se mélangent jamais.
+Pour le 4x4 : compo à quatre en losange (pointe avant, deux ailes, pointe arrière, sans libéro), postes au féminin
+(passeuse, attaquante, centrale, pointue), textes au féminin, et aucune donnée reprise d'Internet
+(pas de classement FFVolley ni de logos adverses). Son thème, aux couleurs de l'équipe (#00aaff, #00f7ff,
+#ffd447 : bandeaux bleus, boutons jaunes, en clair et en sombre), est dans `web/css/team-f4.css`. Nom et logo
+sont provisoires : à changer dans [`stator/teams.py`](stator/teams.py) et `web/img/logo-f4.svg` quand le club
+sera connu ; le nom court se règle aussi dans l'onglet Équipe.
+
+Le **profil coach** est le seul à passer d'une équipe à l'autre : une fois connecté (« Espace coach »
+en bas du menu, ou onglet Équipe), un sélecteur affiche ses deux équipes. Le profil se crée sur le
+serveur avec `python -m stator.coach` (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), partie 7).
+
 ## Aperçu
 
 Captures réalisées avec des données fictives (joueurs, adversaires et stats inventés).
@@ -57,7 +73,8 @@ Tests : `pytest`.
 ## Organisation
 
 ```
-stator/   serveur Flask : base de données (models.py) et API utilisée par la page (api.py, services.py)
+stator/   serveur Flask : base de données (models.py) et API utilisée par la page (api.py, services.py),
+          équipes servies (teams.py), profil coach (coach.py)
 web/      la page : index.html, scripts js/, logo img/, et referentiel.json (gestes, résultats, définitions)
 tests/    tests automatiques
 ```
@@ -69,8 +86,8 @@ commande (`bash deploy/mise-a-jour.sh`), vérification de la version en ligne, s
 
 ## Avant de mettre en ligne
 
-L'application n'a pas encore de mot de passe : elle est faite pour être utilisée en local ou sur
-un réseau de confiance. Avant de l'ouvrir sur Internet, il faut ajouter un mot de passe d'équipe
+Seul le coach a un mot de passe (pour le sélecteur d'équipe). Les joueurs et les joueuses n'en ont
+pas : l'app est faite pour être utilisée en local ou sur un réseau de confiance. Avant de l'ouvrir sur Internet, il faut ajouter un mot de passe d'équipe
 et la servir en HTTPS.
 
 ## Version de démonstration

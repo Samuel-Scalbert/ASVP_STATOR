@@ -190,13 +190,13 @@
         <div class="entry-band-in">
           <button class="icon-btn on-band" onClick=${() => go({ view: "match", matchId })} aria-label="Retour au match"><${Icon} name="back" /></button>
           <div class="entry-title">
-            <span class="eyebrow on-band">ASVP – ${m.opponent}</span>
+            <span class="eyebrow on-band">${q.us()} – ${m.opponent}</span>
             <label class="player-pick">
-              <span class="sr-only">Joueur</span>
+              <span class="sr-only">${C.g("Joueur", "Joueuse")}</span>
               <select id="entry-player" value=${playerId} onChange=${(e) => onSwitch(e.target.value)}>
                 ${players.some((p) => p.id === playerId) ? null : html`<option value=${playerId}>${q.name(playerId)}</option>`}
                 ${others.length
-                  ? html`<optgroup label="Joueurs du match">${inMatch.map(opt)}</optgroup><optgroup label="Autres joueurs">${others.map(opt)}</optgroup>`
+                  ? html`<optgroup label=${C.g("Joueurs du match", "Joueuses du match")}>${inMatch.map(opt)}</optgroup><optgroup label=${C.g("Autres joueurs", "Autres joueuses")}>${others.map(opt)}</optgroup>`
                   : inMatch.map(opt)}
               </select>
             </label>
@@ -270,7 +270,7 @@
           ${nextTab
             ? html`<button class="btn primary" onClick=${() => { setTab(nextTab); root.scrollTo(0, 0); }}>${nextTab === "bilan" ? "Bilan" : "Set " + nextTab}<${Icon} name="next" size=${18} /></button>`
             : html`<div class="row-btns">
-                ${nextPlayer && html`<button class="btn ghost" onClick=${() => { api.flush(); onSwitch(nextPlayer.id); root.scrollTo(0, 0); }}>Joueur suivant : ${nextPlayer.name}<${Icon} name="next" size=${18} /></button>`}
+                ${nextPlayer && html`<button class="btn ghost" onClick=${() => { api.flush(); onSwitch(nextPlayer.id); root.scrollTo(0, 0); }}>${C.g("Joueur suivant", "Joueuse suivante")} : ${nextPlayer.name}<${Icon} name="next" size=${18} /></button>`}
                 <button class="btn primary" onClick=${() => { api.flush(); U.toast("Fiche de " + q.name(playerId) + " enregistrée."); go({ view: "match", matchId }); }}><${Icon} name="check" size=${18} />Terminer</button>
               </div>`}
         </div>
@@ -304,10 +304,10 @@
 
     return html`<div class=${cx("entry", showVideo && "with-video")}>
       ${showVideo && html`<aside class="video-dock" aria-label="Vidéo du match">
-        <div class="video-frame"><iframe src=${embed} title=${"Vidéo du match ASVP – " + m.opponent}
+        <div class="video-frame"><iframe src=${embed} title=${"Vidéo du match " + q.us() + " – " + m.opponent}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
-        <p class="video-tip">Lance la vidéo et compte en direct : la vidéo reste là quand tu changes de set ou de joueur.</p>
+        <p class="video-tip">Lance la vidéo et compte en direct : la vidéo reste là quand tu changes de set ou de ${C.g("joueur", "joueuse")}.</p>
       </aside>`}
       <${SheetEditor} key=${playerId} m=${m} playerId=${playerId} go=${go} onHelp=${onHelp} onSwitch=${onSwitch} videoCtl=${videoCtl} />
     </div>`;

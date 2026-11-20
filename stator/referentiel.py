@@ -10,7 +10,13 @@ from .models import StatField, db
 
 
 def load() -> dict:
-    return json.loads(Path(current_app.config["REFERENTIEL_PATH"]).read_text(encoding="utf-8"))
+    """Le référentiel, avec les postes propres à l'équipe servie (voir teams.py) : les gestes et les stats
+    sont les mêmes pour toutes les équipes."""
+    ref = json.loads(Path(current_app.config["REFERENTIEL_PATH"]).read_text(encoding="utf-8"))
+    roles = (current_app.config.get("STATOR_TEAM") or {}).get("roles")
+    if roles:
+        ref["roles"] = roles
+    return ref
 
 
 def field_rows(ref: dict) -> list[dict]:

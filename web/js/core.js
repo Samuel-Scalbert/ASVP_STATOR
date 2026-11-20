@@ -5,6 +5,14 @@
 
   const MAX_SETS = 5;
   const SET_COLS = ["E", "F", "G", "H", "I"];
+  /* L’équipe servie (window.STATOR_TEAM, posée par le serveur Flask, voir stator/teams.py). Sans serveur
+     (artefact, tests), c’est l’ASVP : 6x6, au masculin, avec le championnat FFVolley. */
+  const TEAM = Object.assign({ key: "asvp", short: "ASVP", name: "ASVP Alsa Team", app: "ASVP Stator", format: 6, gender: "m",
+    league: true, logo: "img/logo-asvp.png" }, root.STATOR_TEAM || {});
+  /* Texte au masculin ou au féminin selon l’équipe : g("joueur", "joueuse"). */
+  const g = (m, f) => (TEAM.gender === "f" ? f : m);
+  /* Notre nom court dans les fichiers Excel : celui réglé dans l’onglet Équipe, sinon celui de l’équipe servie. */
+  const US = () => { try { return root.StatorStore.q.us(); } catch (e) { return TEAM.short; } };
   /* Référentiel (gestes, résultats, postes) : chargé depuis referentiel.json par setReferential(). */
   let POSTES = [], LEVELS = {}, ROLES = [], SKILLS = [], SKILL = {};
   function setReferential(ref) {
@@ -226,7 +234,7 @@
     }
     const base = String(fileName || "").replace(/\.[a-z0-9]+$/i, "").trim();
     const parts = base.split(/\s+[-–—]\s+|\s+vs?\.?\s+/i).map((x) => x.trim()).filter(Boolean);
-    const opponent = parts.find((x) => norm(x) !== "asvp") || "";
+    const opponent = parts.find((x) => norm(x) !== "asvp" && norm(x) !== norm(US())) || "";
     return { opponent, players, scores };
   }
 
@@ -336,7 +344,7 @@
       cols: [4, 120],
       cells: {
         B1: "Ajouter la fiche de " + name + " à l’Excel du coach",
-        B2: "Match ASVP – " + ((match && match.opponent) || "") + when,
+        B2: "Match " + US() + " – " + ((match && match.opponent) || "") + when,
         B4: "1. Ouvre ce fichier et l’Excel du coach (sur Excel ou sur Google Sheets).",
         B5: "2. Ici, dans l’onglet « " + tab + " », sélectionne les cases E3 à I30 (tape E3:I30 dans la zone Nom, en haut à gauche, puis Entrée), puis copie (Ctrl+C).",
         B6: "3. Dans l’Excel du coach, ouvre l’onglet « " + tab + " » et clique sur la case E3.",
@@ -367,7 +375,7 @@
     per.forEach(({ p }) => { const b = (p.doc && p.doc.bilan) || {}; bil["B" + r] = p.name; bil["C" + r] = b.cp || ""; bil["D" + r] = b.cm || ""; r++; });
 
     // STATS Points
-    const sp = Object.assign({ C3: "ASVP", C4: "EQUIPE ADVERSE" }, head);
+    const sp = Object.assign({ C3: US(), C4: "EQUIPE ADVERSE" }, head);
     let sa = 0, so = 0;
     for (let i = 0; i < nSheetsSets; i++) {
       const s = sets[i];
@@ -396,9 +404,9 @@
       }
       return start;
     };
-    block("Points marqués par ASVP", "Tous points gagnants (attaques - services - blocs)", (set) => scoreLine([set]).P, "a");
+    block("Points marqués par " + US(), "Tous points gagnants (attaques - services - blocs)", (set) => scoreLine([set]).P, "a");
     r++;
-    block("Points perdus par ASVP", "Tous points perdus (attaques - services - réception - passes)", (set) => scoreLine([set]).F, "o");
+    block("Points perdus par " + US(), "Tous points perdus (attaques - services - réception - passes)", (set) => scoreLine([set]).F, "o");
     r++;
     block("Ratios joueur", "Différence entre points marqués et erreurs", (set) => scoreLine([set]).diff, null);
     r++;
@@ -496,7 +504,7 @@
   }
 
   const api = {
-    MAX_SETS, SET_COLS, setReferential,
+    MAX_SETS, SET_COLS, setReferential, TEAM, g,
     norm, slug, uid, todayIso, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
     canonSets, sameSets, diffSets,
     opponentLine, matchSets, matchResult, matchSetCount, seasonOf,

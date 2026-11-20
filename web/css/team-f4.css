@@ -1,0 +1,69 @@
+/* Thème de l’équipe féminine 4x4 : #00aaff (bleu), #00f7ff (cyan), #ffd447 (jaune).
+   Chargé après les styles d’index.html par le serveur (stator/teams.py, « css »), seulement pour cette équipe.
+
+   Mode clair : bandeaux bleu vif (menu, barre du haut, bandeaux de match et de saisie, match en vedette) avec un
+   texte bleu nuit lisible dessus (≈ 7:1 ; le blanc sur ce bleu ne l’est pas). Boutons principaux jaunes, texte
+   bleu nuit. Lien actif du menu en pastille cyan.
+   Mode sombre : bandeaux bleu profond, pour ne pas éblouir ; le cyan et le jaune deviennent les points lumineux. */
+
+:root {
+  --bg: #eaf6fc;
+  --band: #00aaff;
+  --band-2: #0096e6;
+  --band-ink: #0b1526;
+  --band-muted: #0a3352;
+  --band-line: rgba(11, 21, 38, 0.2);
+  --band-wash: rgba(255, 255, 255, 0.3);
+  --band-hi: #0b1526;            /* ce qui ressort sur un bandeau : score, nom de l’app, onglet actif */
+  --side-glow: rgba(255, 255, 255, 0.5);
+  --accent: #00aaff;
+  --accent-2: #00f7ff;
+  --cta: #ffd447;
+  --cta-ink: #0b1526;
+  --cta-soft: rgba(255, 212, 71, 0.24);
+  --cta-on-surface: #0090d9;     /* icônes des titres de cartes : le jaune est illisible sur fond blanc */
+  --nav-on: #00f7ff;
+  --nav-on-ink: #0b1526;
+  --focus: #0b1526;
+  --court: #e4f6ff; --court-line: #7ccbf0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #06141d; --surface: #0c1f2b; --surface-2: #10283a; --line: #1a3a4f; --line-2: #24506a;
+    --band: #04324f; --band-2: #0a4566; --band-ink: #eafbff; --band-muted: #8fd3ef;
+    --band-line: rgba(0, 247, 255, 0.22); --band-wash: rgba(0, 247, 255, 0.1); --band-hi: #ffd447;
+    --side-glow: rgba(0, 247, 255, 0.2);
+    --cta-on-surface: #ffd447; --nav-on: rgba(0, 247, 255, 0.16); --nav-on-ink: #00f7ff; --focus: #00f7ff;
+    --court: #0c2534; --court-line: #1d7aa3;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #06141d; --surface: #0c1f2b; --surface-2: #10283a; --line: #1a3a4f; --line-2: #24506a;
+  --band: #04324f; --band-2: #0a4566; --band-ink: #eafbff; --band-muted: #8fd3ef;
+  --band-line: rgba(0, 247, 255, 0.22); --band-wash: rgba(0, 247, 255, 0.1); --band-hi: #ffd447;
+  --side-glow: rgba(0, 247, 255, 0.2);
+  --cta-on-surface: #ffd447; --nav-on: rgba(0, 247, 255, 0.16); --nav-on-ink: #00f7ff; --focus: #00f7ff;
+  --court: #0c2534; --court-line: #1d7aa3;
+}
+
+/* Sur un bandeau, le jaune du thème ASVP devient la couleur « qui ressort » du bandeau. */
+.brand b, .side-team b, .board-score { color: var(--band-hi); }
+.subtabs button.on { border-bottom-color: var(--band-hi); }
+.coach-team.on { border-color: var(--band-hi); }
+.coach-team.on .ico { color: var(--band-hi); }
+
+/* Lien actif du menu : pastille cyan (mode clair), ou halo cyan (mode sombre). */
+.side-link.on { background: var(--nav-on); color: var(--nav-on-ink); }
+.side-link.on .ico { color: var(--nav-on-ink); }
+
+/* Barre d’onglets du téléphone : un bandeau bleu, comme la barre du haut. */
+.tabbar { background: var(--band); border-top-color: var(--band-line); }
+.tab { color: var(--band-muted); }
+.tab.on { color: var(--band-ink); }
+.tab.on .ico { color: var(--nav-on-ink); background: var(--nav-on); border-radius: 999px; padding: 2px 12px; box-sizing: content-box; }
+
+/* Icônes des titres posées sur les cartes : bleu en mode clair, jaune en mode sombre. */
+.h-sec .ico, .vb-comment .ico { color: var(--cta-on-surface); }
+
+/* Boutons jaunes : un liseré pour qu’ils gardent leur forme sur fond blanc. */
+.btn.primary { box-shadow: inset 0 0 0 1px rgba(11, 21, 38, 0.12); }

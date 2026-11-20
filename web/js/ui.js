@@ -64,6 +64,7 @@
     pin: "M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
     ball: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3.3 10.2c3.2 1.2 6.3.8 8.7-1.6M12 20.9c-1.2-3.1-.2-6.3 2.4-8.4M20.7 9.6c-3.3-.2-6.1 1.3-8 4",
     swap: "M7 11L3.5 7.5 7 4M4 7.5h12M17 13l3.5 3.5L17 20M20 16.5H8",
+    lock: "M7.5 11V8a4.5 4.5 0 0 1 9 0v3M6 11h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM12 15v2.5",
     flag: "M5 21V4M5 4h11l-2 4 2 4H5",
     moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
     sun: "M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21M5.6 5.6l1.1 1.1M17.3 17.3l1.1 1.1M5.6 18.4l1.1-1.1M17.3 6.7l1.1-1.1M12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9z",
@@ -261,8 +262,12 @@
     const k = String(name || "").normalize("NFD").toUpperCase().replace(/[^A-Z0-9]/g, "");
     return CLUB_LOGOS[k] || CLUB_LOGOS[k.replace(/\d+$/, "")] || "";
   }
-  function TeamLogo({ name, size }) {
-    const key = logoKey(name), s = size || 22;
+  /* us : notre équipe (logo de l’équipe servie). Les logos des adversaires viennent des clubs de la poule
+     FFVolley : seulement pour une équipe qui suit ce championnat. */
+  function TeamLogo({ name, size, us }) {
+    const s = size || 22;
+    if (us && C.TEAM.key !== "asvp") return html`<img class="team-logo us" src=${C.TEAM.logo} width=${s} height=${s} alt="" style="object-fit:contain" />`;
+    const key = us ? "asvp" : C.TEAM.league ? logoKey(name) : "";
     return key
       ? html`<img class="team-logo" src=${"img/clubs/" + key + ".webp"} width=${s} height=${s} alt="" loading="lazy" />`
       : html`<span class="team-logo none" style=${"width:" + s + "px;height:" + s + "px;font-size:" + Math.max(6, Math.round(s * 0.27)) + "px"} aria-hidden="true">no logo</span>`;
@@ -279,7 +284,7 @@
     return html`<div class="alert-box" role="alert">
       <div class="alert-head"><span class="alert-badge">ATTENTION</span>
         <b>Les chiffres annoncés dans l’Excel du coach diffèrent de ${who ? "la saisie de " + who : "ta saisie"}.</b></div>
-      <p class="small">Excel « ${excel.file || "feuille de match"} », importé${when}. Rien n’a été modifié : ${who ? "le joueur ou toi choisissez" : "à toi de choisir"} la version à garder.</p>
+      <p class="small">Excel « ${excel.file || "feuille de match"} », importé${when}. Rien n’a été modifié : ${who ? C.g("le joueur", "la joueuse") + " ou toi choisissez" : "à toi de choisir"} la version à garder.</p>
       ${diffs.length || bilanDiffs.length ? html`<details class="alert-details"><summary>Voir les différences (${diffs.length + bilanDiffs.length})</summary>
         <ul>${diffs.map((d, i) => html`<li key=${i}>Set ${d.set} · ${d.label} : app <b>${d.app}</b> · Excel <b>${d.excel}</b></li>`)}
           ${bilanDiffs.map(([k, l]) => html`<li key=${k}>${l} : texte différent dans l’Excel (« ${eb[k]} »)</li>`)}</ul>

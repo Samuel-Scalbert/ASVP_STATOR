@@ -20,18 +20,22 @@ main() {
     exit 1
   fi
 
-  echo "1/4 Sauvegarde de la base"
+  echo "1/4 Sauvegarde des bases"
   mkdir -p instance/sauvegardes
-  if [ -f instance/stator.db ]; then
-    local copie="instance/sauvegardes/stator-avant-maj-$(date +%Y-%m-%d_%H%M%S).db"
+  local quand base nom copie
+  quand=$(date +%Y-%m-%d_%H%M%S)
+  # Une base par équipe : stator.db (ASVP), stator-f4.db (équipe féminine 4x4).
+  for base in instance/stator.db instance/stator-f4.db; do
+    [ -f "$base" ] || continue
+    nom=$(basename "$base" .db)
+    copie="instance/sauvegardes/${nom}-avant-maj-${quand}.db"
     # Copie sûre même si quelqu'un est en train de saisir (sauvegarde intégrée de SQLite).
     "$VENV/bin/python" -c "import sqlite3,sys; s=sqlite3.connect(sys.argv[1]); d=sqlite3.connect(sys.argv[2]); s.backup(d); d.close(); s.close()" \
-      instance/stator.db "$copie"
+      "$base" "$copie"
     echo "    copie : $copie"
-    ls -1t instance/sauvegardes/stator-avant-maj-*.db | tail -n +$((GARDER + 1)) | xargs -r rm --
-  else
-    echo "    pas encore de base : rien à sauvegarder"
-  fi
+    ls -1t instance/sauvegardes/"${nom}"-avant-maj-*.db | tail -n +$((GARDER + 1)) | xargs -r rm --
+  done
+  [ -f instance/stator.db ] || echo "    pas encore de base : rien à sauvegarder"
 
   echo "2/4 Récupération de la dernière version sur GitHub"
   git pull --ff-only

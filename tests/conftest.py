@@ -6,10 +6,13 @@ from stator.models import db
 
 @pytest.fixture()
 def app(tmp_path):
-    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}"})
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}",
+                      "TEAM_DATABASES": {"f4": f"sqlite:///{tmp_path / 'test-f4.db'}"},
+                      "SECRET_KEY": "cle-de-test", "COACH_PROFILE": str(tmp_path / "coach.json")})
     yield app
-    with app.app_context():
-        db.engine.dispose()
+    for a in [app, *app.extensions["stator_teams"].values()]:
+        with a.app_context():
+            db.engine.dispose()
 
 
 @pytest.fixture()

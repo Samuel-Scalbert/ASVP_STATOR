@@ -7,11 +7,14 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 7;
+  const API_LEVEL = 8;
   const COLS = ["matches", "stats"];
 
-  function lsGet(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } }
+  /* Les équipes partagent le même site, donc le même stockage du navigateur : chaque équipe autre que l’ASVP
+     range ses réglages sous son propre préfixe (joueur choisi, écran ouvert…). Le thème reste commun. */
+  const lsKey = (k) => (C.TEAM.key === "asvp" || k === "asvp-stator-theme" ? k : k.replace(/^asvp-stator-/, "stator-" + C.TEAM.key + "-"));
+  function lsGet(k, d) { try { const v = localStorage.getItem(lsKey(k)); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(lsKey(k), JSON.stringify(v)); } catch (e) { /* stockage indisponible */ } }
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const store = {
@@ -23,6 +26,7 @@
     config: null, matches: {}, stats: {},
     app: null,              // version du serveur (mode api) : { version, commit, date }
     league: null,           // championnat FFVolley (mode api) : matchs de la poule, voir stator/ffvb.py
+    coach: null,            // profil coach (mode api) : { available, coach: { name, teams } | null }, voir stator/coach.py
     v: 0, subs: new Set(), db: null,
   };
   function emit() { store.v++; store.subs.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); }
@@ -180,6 +184,7 @@
     applyConfig(first.config);
     COLS.forEach((c) => applyCollection(c, first[c] || {}));
     store.league = first.league || null; // championnat FFVolley (lecture seule, voir stator/ffvb.py)
+    store.coach = first.coach || null;
     store.ready = true;
     emit();
     let busy = false;
@@ -196,6 +201,7 @@
         applyConfig(s.config);
         COLS.forEach((c) => applyCollection(c, s[c] || {}));
         store.league = s.league || null;
+        store.coach = s.coach || store.coach;
         if (store.notice && store.notice.kind === "net") store.notice = null;
         emit();
       } catch (e) { /* le serveur reviendra ; on garde l’affichage */ }
@@ -285,6 +291,21 @@
       scheduleStats(doc.id, immediate);
     },
     flush,
+    /* Profil coach : connexion (mot de passe) et déconnexion. Renvoie un message d’erreur, ou "" si c’est bon. */
+    async coachLogin(password) {
+      try {
+        const res = await fetch("api/coach/login", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ password }) });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return body.error || "Connexion impossible.";
+        store.coach = body; emit(); return "";
+      } catch (e) { return "Serveur injoignable : vérifie la connexion."; }
+    },
+    async coachLogout() {
+      try {
+        const res = await fetch("api/coach/logout", { method: "POST", headers: { Accept: "application/json" } });
+        if (res.ok) { store.coach = await res.json(); emit(); }
+      } catch (e) { /* on réessaiera */ }
+    },
   };
 
   /* Accès dérivés */
@@ -293,7 +314,9 @@
     active() { return q.roster().filter((p) => p.active !== false); },
     /* Compos types du coach (onglet Équipe) : six de départ, libéro, binômes, commentaire. */
     templates() { return (store.config && Array.isArray(store.config.templates)) ? store.config.templates : []; },
-    name(id) { const p = q.roster().find((x) => x.id === id); return p ? p.name : "Joueur retiré"; },
+    name(id) { const p = q.roster().find((x) => x.id === id); return p ? p.name : C.g("Joueur retiré", "Joueuse retirée"); },
+    /* Notre nom court : « ASVP » sur les tableaux de score, « ASVP – adversaire »… (réglable dans l’onglet Équipe). */
+    us() { return (store.config && store.config.team) || C.TEAM.short; },
     posteLabel(id) {
       const p = q.roster().find((x) => x.id === id);
       const r = p && C.ROLES.find((x) => x.k === p.poste);

@@ -74,14 +74,14 @@
     const X = await loadXLSX();
     const wb = specToWorkbook(X, C.matchWorkbookSpec(m, q.playersOf(m.id)));
     const buf = X.write(wb, { bookType: "xlsx", type: "array" });
-    return saveFile("ASVP - " + safeName(m.opponent || "match") + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
+    return saveFile(safeName(q.us()) + " - " + safeName(m.opponent || "match") + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
   }
   /* La fiche d’un joueur seul, au format de son onglet dans l’Excel du coach. */
   async function exportPlayer(m, name, doc) {
     const X = await loadXLSX();
     const wb = specToWorkbook(X, C.playerExportSpec(name, doc, m));
     const buf = X.write(wb, { bookType: "xlsx", type: "array" });
-    return saveFile("ASVP - " + safeName(m.opponent || "match") + " - " + safeName(name) + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
+    return saveFile(safeName(q.us()) + " - " + safeName(m.opponent || "match") + " - " + safeName(name) + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
   }
   async function exportSeason() {
     const X = await loadXLSX();
@@ -89,7 +89,7 @@
     const wb = specToWorkbook(X, C.seasonWorkbookSpec(entries, q.roster()));
     const buf = X.write(wb, { bookType: "xlsx", type: "array" });
     const season = (store.config && store.config.season) || "saison";
-    return saveFile("ASVP - Stats " + safeName(season) + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
+    return saveFile(safeName(q.us()) + " - Stats " + safeName(season) + ".xlsx", new Blob([buf], { type: XLSX_MIME }));
   }
   async function readWorkbookFile(file) {
     const X = await loadXLSX();

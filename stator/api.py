@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 
-from . import referentiel, services
+from . import coach, referentiel, services
 from .models import db
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -31,7 +31,22 @@ def health():
 def get_state():
     data = services.state()
     data["app"] = current_app.config["STATOR_VERSION"]  # version qui tourne sur ce serveur
+    data["coach"] = coach.state_doc()  # profil coach : sélecteur d'équipe s'il est connecté
     return jsonify(data)
+
+
+@bp.post("/coach/login")
+def coach_login():
+    ok, message = coach.login(_body().get("password"))
+    if not ok:
+        return jsonify(error=message), 403
+    return jsonify(coach.state_doc())
+
+
+@bp.post("/coach/logout")
+def coach_logout():
+    coach.logout()
+    return jsonify(coach.state_doc())
 
 
 @bp.put("/config")
@@ -68,4 +83,6 @@ def delete_stats(sheet_id: str):
 @bp.put("/league")
 def put_league():
     """Données du championnat FFVolley, envoyées par stator/ffvb.py (voir ce module)."""
+    if not current_app.config["STATOR_TEAM"]["league"]:
+        return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
     return jsonify(services.save_league(_body()))

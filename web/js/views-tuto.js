@@ -3,7 +3,9 @@
   "use strict";
   const { html, useState, useEffect } = root.htmPreact;
   const C = root.StatorCore;
-  const { store } = root.StatorStore;
+  const { store, q } = root.StatorStore;
+  /* Le tuto suit l’équipe servie : 6x6 ou 4x4, au masculin ou au féminin, avec ou sans championnat FFVolley. */
+  const J = C.g("joueur", "joueuse"), JS = C.g("joueurs", "joueuses"), SIX = C.TEAM.format !== 4, LEAGUE = C.TEAM.league;
   const U = root.StatorUI;
   const { Icon, Tile, LevelLegend, cx, pct, signed } = U;
 
@@ -107,7 +109,7 @@
         <text x="257" y=${y(17)} text-anchor="middle" class="sm-t">légende</text>
         ${[[3, "3"], [30, "30"], [32, "32"], [41, "41"]].map(([r, t]) => html`<text key=${t} x="18" y=${y(r) + 3.5} text-anchor="end" class="sm-t">${t}</text>`)}
       </svg>
-      <figcaption class="muted small">L’onglet d’un joueur, identique dans la fiche téléchargée et dans l’Excel du coach. Seuls les deux blocs colorés sont à copier.</figcaption>
+      <figcaption class="muted small">L’onglet d’${C.g("un joueur", "une joueuse")}, identique dans la fiche téléchargée et dans l’Excel du coach. Seuls les deux blocs colorés sont à copier.</figcaption>
     </figure>`;
   }
 
@@ -121,7 +123,7 @@
       <div class="tuto-head">
         <span class="eyebrow">Tuto</span>
         <h1 class="h-page">Comprendre les stats</h1>
-        <p class="lead">Ce qu’on compte pendant un match, comment le saisir, et comment chaque chiffre de l’app est calculé. Les exemples suivent la même fiche fictive d’un joueur, du début à la fin.</p>
+        <p class="lead">Ce qu’on compte pendant un match, comment le saisir, et comment chaque chiffre de l’app est calculé. Les exemples suivent la même fiche fictive d’${C.g("un joueur", "une joueuse")}, du début à la fin.</p>
       </div>
       <div class="tuto-layout">
         <nav class="toc" aria-label="Sommaire du tuto">
@@ -132,10 +134,10 @@
 
           <section class="card" id="tuto-principe">
             <h2 class="h-sec"><span class="sec-n">1</span>Le principe</h2>
-            <p>Après chaque match, on remplit une <b>fiche par joueur</b> : ce qu’il a fait à chaque geste (service, bloc, réception, passe, attaque), <b>set par set</b>, puis un court bilan. L’app additionne et calcule tout le reste : points marqués, fautes, taux de transformation, tableaux de l’équipe et de la saison.</p>
+            <p>Après chaque match, on remplit une <b>fiche par ${J}</b> : ${C.g("ce qu’il a fait", "ce qu’elle a fait")} à chaque geste (service, bloc, réception, passe, attaque), <b>set par set</b>, puis un court bilan. L’app additionne et calcule tout le reste : points marqués, fautes, taux de transformation, tableaux de l’équipe et de la saison.</p>
             <ol class="howto">
               <li><b>Ouvre le match</b> (onglet Matchs), puis « Saisir les stats ». S’il n’existe pas encore, crée-le dans l’onglet « Nouveau match ».</li>
-              <li><b>Compte les actions</b> de chaque joueur, set par set : une touche = une action.</li>
+              <li><b>Compte les actions</b> de chaque ${J}, set par set : une touche = une action.</li>
               <li><b>Écris le bilan</b> : les + et les − pour soi, puis pour l’équipe.</li>
             </ol>
           </section>
@@ -143,10 +145,10 @@
           <section class="card" id="tuto-saisie">
             <h2 class="h-sec"><span class="sec-n">2</span>Saisir une fiche</h2>
             <ul class="bullets">
-              <li><b>Le joueur</b> se choisit en haut de l’écran. « Joueur suivant », à la fin du bilan, enchaîne les fiches : une seule personne peut saisir toute l’équipe.</li>
-              <li><b>Les sets</b> sont des onglets. Un set sans aucune stat apparaît <span class="pill-demo">grisé</span> : le joueur n’était pas sur le terrain. Il reste cliquable en cas d’oubli.</li>
+              <li><b>${C.g("Le joueur", "La joueuse")}</b> se choisit en haut de l’écran. « ${C.g("Joueur suivant", "Joueuse suivante")} », à la fin du bilan, enchaîne les fiches : une seule personne peut saisir toute l’équipe.</li>
+              <li><b>Les sets</b> sont des onglets. Un set sans aucune stat apparaît <span class="pill-demo">grisé</span> : ${C.g("le joueur n’était pas", "la joueuse n’était pas")} sur le terrain. Il reste cliquable en cas d’oubli.</li>
               <li><b>Toucher une case</b> ajoute 1. Le <b>−</b> dans son coin retire 1. « Annuler », en bas, efface la dernière touche.</li>
-              <li><b>La vidéo YouTube</b> du match, si son lien est renseigné, s’affiche à côté des cases sur PC et reste en place quand on change de set ou de joueur.</li>
+              <li><b>La vidéo YouTube</b> du match, si son lien est renseigné, s’affiche à côté des cases sur PC et reste en place quand on change de set ou de ${J}.</li>
               <li><b>Tout s’enregistre seul</b>, à chaque touche. Il n’y a rien à envoyer.</li>
             </ul>
             <${TryPad} />
@@ -171,7 +173,7 @@
           <section class="card" id="tuto-calculs">
             <h2 class="h-sec"><span class="sec-n">4</span>Comment les chiffres sont calculés</h2>
             <div class="example-sheet">
-              <span class="f-ex-k">Fiche d’exemple (un joueur, un match)</span>
+              <span class="f-ex-k">Fiche d’exemple (${C.g("un joueur", "une joueuse")}, un match)</span>
               <ul>${C.SKILLS.map((s) => html`<li key=${s.key}><b>${s.label}</b> : ${Object.keys(s.outcomes).map((o) => s.outcomes[o].label.toLowerCase() + " " + ex(s.key, o)).join(" · ")}</li>`)}</ul>
             </div>
 
@@ -181,7 +183,7 @@
             <${Formula} label="Fautes (points perdus)" expr=${minus.map((x) => x.label).join(" + ")}
               example=${minus.map((x) => x.label + " : " + x.n).join(" · ") + " → " + F + " fautes"} />
             <${Formula} label="Différence" expr="Points marqués − fautes"
-              example=${P + " − " + F + " = " + signed(P - F) + " : positive, le joueur rapporte plus de points qu’il n’en donne."} />
+              example=${P + " − " + F + " = " + signed(P - F) + " : positive, " + C.g("le joueur", "la joueuse") + " rapporte plus de points qu’" + C.g("il", "elle") + " n’en donne."} />
 
             <h3 class="h-calc">Taux de transformation</h3>
             <p>Pour chaque geste : la part des gestes réussis sur tous les gestes tentés.</p>
@@ -196,7 +198,7 @@
             <p class="muted small">Pour les passes et les attaques, les postes 2, 3 et 4 sont comptés séparément mais additionnés dans le taux.</p>
 
             <h3 class="h-calc">Score et stats</h3>
-            <${Formula} label="Points venus des fautes adverses (ou non saisis)" expr="Score de l’ASVP dans le set − points marqués saisis"
+            <${Formula} label="Points venus des fautes adverses (ou non saisis)" expr=${"Score " + (C.TEAM.key === "asvp" ? "de l’ASVP" : "de l’équipe") + " dans le set − points marqués saisis"}
               example="Set gagné 25–20, l’équipe a saisi 15 points marqués : 25 − 15 = 10 points venus des fautes de l’adversaire, ou d’actions oubliées." />
             <${Formula} label="Points gagnés par l’adversaire sur ses actions (ou non saisis)" expr="Score de l’adversaire dans le set − fautes saisies"
               example="20 points adverses, l’équipe a saisi 6 fautes : 20 − 6 = 14 points marqués par l’adversaire lui-même (attaques, aces, contres) ou non saisis." />
@@ -208,8 +210,8 @@
 
             <h3 class="h-calc">Équipe et saison</h3>
             <ul class="bullets">
-              <li><b>Totaux d’équipe</b> : la somme des fiches de tous les joueurs, set par set et sur le match.</li>
-              <li><b>Saisies</b> : « 5 sur 14 » = joueurs ayant au moins une action ou un bilan, sur l’effectif.</li>
+              <li><b>Totaux d’équipe</b> : la somme des fiches de ${C.g("tous les joueurs", "toutes les joueuses")}, set par set et sur le match.</li>
+              <li><b>Saisies</b> : « 5 sur 14 » = ${JS} ayant au moins une action ou un bilan, sur l’effectif.</li>
               <li><b>Saison</b> : les totaux additionnent tous les matchs saisis ; les taux sont recalculés sur l’ensemble des gestes de la saison, de la même façon que sur un match.</li>
             </ul>
           </section>
@@ -218,18 +220,20 @@
             <h2 class="h-sec"><span class="sec-n">5</span>Lire les écrans</h2>
             <dl class="calc">
               <dt>Matchs</dt><dd>Tous les matchs joués, du plus récent au plus ancien (le dernier en grand) : score, sets, où en est ta fiche et une barre des fiches remplies. Un match complet s’affiche en vert. « Saisir mes stats » ouvre directement ta fiche de ce match.</dd>
-              <dt>Calendrier</dt><dd>À droite de l’accueil (sous le dernier match sur téléphone). En bleu les matchs joués, en orange les matchs à venir. Les matchs du championnat y sont tout seuls, avec l’heure et la salle (repris du site de la FFVolley) : un clic ouvre la fiche de l’adversaire. Pour un autre match (amical…), « Ajouter un autre match » ou un clic sur un jour libre.</dd>
-              <dt>Match à venir</dt><dd>Un clic sur un match du calendrier ouvre sa page : quand (match et échauffement, une heure avant), où (salle, adresse, itinéraire), maillots, l’adversaire et son classement, les joueurs convoqués, et la préparation du coach : consignes et compo.</dd>
-              <dt>Compo du coach</dt><dd>Sur la page d’un match, « Faire la compo » : le coach place les six joueurs sur le terrain (trois au filet, trois à l’arrière ; les listes sont rangées par poste) et le libéro à côté. Chaque case prend la couleur du poste : passeur bleu, pointu orange, R4 vert, central violet, libéro jaune. Sous chaque joueur, « + binôme » lui associe un remplaçant au profil proche ; il ajoute aussi un commentaire. Une compo est fixe, sans rotation. Jusqu’à quatre compos par match, par exemple une par set. « Partir d’une compo type » reprend une compo enregistrée dans l’onglet Équipe.</dd>
+              <dt>Calendrier</dt><dd>À droite de l’accueil (sous le dernier match sur téléphone). En bleu les matchs joués, en orange les matchs à venir. ${LEAGUE ? "Les matchs du championnat y sont tout seuls, avec l’heure et la salle (repris du site de la FFVolley) : un clic ouvre la fiche de l’adversaire. Pour un autre match (amical…), « Ajouter un autre match » ou un clic sur un jour libre." : "Pour ajouter un match à venir, « Ajouter un autre match » ou un clic sur un jour libre."}</dd>
+              <dt>Match à venir</dt><dd>Un clic sur un match du calendrier ouvre sa page : quand (match et échauffement, une heure avant), ${LEAGUE ? "où (salle, adresse, itinéraire), maillots, l’adversaire et son classement" : "où (à domicile ou à l’extérieur)"}, les ${C.g("joueurs convoqués", "joueuses convoquées")}, et la préparation du coach : consignes et compo.</dd>
+              <dt>Compo du coach</dt><dd>Sur la page d’un match, « Faire la compo » : ${SIX
+                ? "le coach place les six joueurs sur le terrain (trois au filet, trois à l’arrière ; les listes sont rangées par poste) et le libéro à côté. Chaque case prend la couleur du poste : passeur bleu, pointu orange, R4 vert, central violet, libéro jaune. Sous chaque joueur, « + binôme » lui associe un remplaçant au profil proche ; il ajoute aussi un commentaire."
+                : "le coach place les quatre " + JS + " sur le terrain (en losange : pointe avant au filet au poste 3, ailes aux postes 4 et 2, pointe arrière au poste 1 ; les listes sont rangées par poste), sans libéro. Chaque case prend la couleur du poste : " + C.ROLES.map((r) => r.label.toLowerCase()).join(", ") + ". Sous chaque " + J + ", « + binôme » lui associe " + C.g("un remplaçant", "une remplaçante") + " au profil proche ; il ajoute aussi un commentaire."} Une compo est fixe, sans rotation. Jusqu’à quatre compos par match, par exemple une par set. « Partir d’une compo type » reprend une compo enregistrée dans l’onglet Équipe.</dd>
               <dt>Consignes du coach</dt><dd>En tête de la page du match, « Écrire les consignes » : une consigne par ligne avec sa priorité, rouge (essentiel), orange (important) ou vert (bon à savoir). Elles s’affichent encadrées, du rouge au vert, et restent visibles après le match dans « Préparation du match ».</dd>
-              <dt>Classement</dt><dd>Le classement de la poule, recalculé à partir des scores officiels (3 points pour 3-0 ou 3-1, 2 pour 3-2, 1 pour 2-3 ; à égalité : victoires, puis ratio des sets, puis ratio des points), les journées avec leurs résultats et le classement final de la saison dernière. Un clic sur une équipe ouvre sa fiche : son bilan, ses résultats set par set, les adversaires que nous avons en commun, et pour nos prochains matchs contre elle la salle avec son adresse, l’itinéraire et la couleur des maillots.</dd>
-              <dt>Nouveau match</dt><dd>Choisir « Match départemental » (à domicile ou à l’extérieur) ou « Match amical », remplir l’adversaire, la date et la vidéo (lien YouTube, ou fichier enregistré sur Discord), puis cocher les joueurs du match : seuls eux comptent dans le suivi des saisies. Sans vidéo, l’option « score seulement » enregistre juste le score et marque le match NO VIDEO / NO DATA.</dd>
-              <dt>Marquer terminé</dt><dd>Quand toutes les fiches d’un match sont remplies, la barre passe à 100 % et le match est « complet ». Si des joueurs ne saisiront pas, le bouton « Marquer terminé » (page du match) arrête le suivi. L’écart restant avec le score devient des « points non notés » : moments sans vidéo, ou fautes de l’adversaire que la fiche ne note pas. Ils ne sont pas comptabilisés dans les stats. « Rouvrir la saisie » permet de corriger une fiche.</dd>
+              ${LEAGUE && html`<dt>Classement</dt><dd>Le classement de la poule, recalculé à partir des scores officiels (3 points pour 3-0 ou 3-1, 2 pour 3-2, 1 pour 2-3 ; à égalité : victoires, puis ratio des sets, puis ratio des points), les journées avec leurs résultats et le classement final de la saison dernière. Un clic sur une équipe ouvre sa fiche : son bilan, ses résultats set par set, les adversaires que nous avons en commun, et pour nos prochains matchs contre elle la salle avec son adresse, l’itinéraire et la couleur des maillots.</dd>`}
+              <dt>Nouveau match</dt><dd>Choisir « Match départemental » (à domicile ou à l’extérieur) ou « Match amical », remplir l’adversaire, la date et la vidéo (lien YouTube, ou fichier enregistré sur Discord), puis cocher les ${JS} du match : seuls eux comptent dans le suivi des saisies. Sans vidéo, l’option « score seulement » enregistre juste le score et marque le match NO VIDEO / NO DATA.</dd>
+              <dt>Marquer terminé</dt><dd>Quand toutes les fiches d’un match sont remplies, la barre passe à 100 % et le match est « complet ». Si des ${JS} ne saisiront pas, le bouton « Marquer terminé » (page du match) arrête le suivi. L’écart restant avec le score devient des « points non notés » : moments sans vidéo, ou fautes de l’adversaire que la fiche ne note pas. Ils ne sont pas comptabilisés dans les stats. « Rouvrir la saisie » permet de corriger une fiche.</dd>
               <dt>Match › Synthèse</dt><dd>Qui a rempli sa fiche, les points et fautes de l’équipe, les taux par geste, d’où viennent les points de chaque set, et ce qu’on laisse à l’adversaire.</dd>
-              <dt>Match › Joueurs</dt><dd>Le classement des joueurs (points, fautes, différence) et leurs taux, pour le match entier ou un set. Plus bas, « Détail set par set » montre un tableau joueurs × sets, comme les feuilles STATS de l’Excel.</dd>
-              <dt>Match › Bilans</dt><dd>Tous les bilans collectifs (les + et les −) regroupés, puis les bilans perso de chaque joueur.</dd>
-              <dt>Saison</dt><dd>Victoires, sets, courbe des taux match par match (pour l’équipe ou un joueur) et totaux de chaque joueur.</dd>
-              <dt>Bouton « Excel »</dt><dd>Sur un match : le fichier au format habituel (BILAN, STATS Points, STATS Taux de transformation, une feuille par joueur). Sur la saison : un récapitulatif de tous les matchs.</dd>
+              <dt>Match › ${C.g("Joueurs", "Joueuses")}</dt><dd>Le classement des ${JS} (points, fautes, différence) et leurs taux, pour le match entier ou un set. Plus bas, « Détail set par set » montre un tableau ${JS} × sets, comme les feuilles STATS de l’Excel.</dd>
+              <dt>Match › Bilans</dt><dd>Tous les bilans collectifs (les + et les −) regroupés, puis les bilans perso de chaque ${J}.</dd>
+              <dt>Saison</dt><dd>Victoires, sets, courbe des taux match par match (pour l’équipe ou ${C.g("un joueur", "une joueuse")}) et totaux de chaque ${J}.</dd>
+              <dt>Bouton « Excel »</dt><dd>Sur un match : le fichier au format habituel (BILAN, STATS Points, STATS Taux de transformation, une feuille par ${J}). Sur la saison : un récapitulatif de tous les matchs.</dd>
             </dl>
           </section>
 
@@ -239,26 +243,26 @@
             <div class="tbl-wrap"><table class="tbl map">
               <thead><tr><th scope="col" class="left">Dans l’Excel</th><th scope="col" class="left">Dans l’app</th></tr></thead>
               <tbody>
-                <tr><th scope="row" class="left">Feuille de chaque joueur (cases à remplir)</th><td class="left">Saisir les stats : une case par ligne de l’Excel, set par set</td></tr>
+                <tr><th scope="row" class="left">Feuille de chaque ${J} (cases à remplir)</th><td class="left">Saisir les stats : une case par ligne de l’Excel, set par set</td></tr>
                 <tr><th scope="row" class="left">Taux de transformation, points marqués, erreurs</th><td class="left">Calculés seuls : en haut de chaque geste et dans le bilan de la fiche</td></tr>
                 <tr><th scope="row" class="left">Bilan perso et collectif (+ / −)</th><td class="left">Onglet Bilan de la fiche ; tous les bilans dans Match › Bilans</td></tr>
                 <tr><th scope="row" class="left">Feuille BILAN</th><td class="left">Match › Bilans</td></tr>
-                <tr><th scope="row" class="left">STATS Points (par joueur et par set, différence)</th><td class="left">Match › Joueurs › Détail set par set</td></tr>
-                <tr><th scope="row" class="left">STATS Taux de transformation</th><td class="left">Match › Joueurs › Détail set par set (choisir « Taux … »)</td></tr>
+                <tr><th scope="row" class="left">STATS Points (par ${J} et par set, différence)</th><td class="left">Match › ${C.g("Joueurs", "Joueuses")} › Détail set par set</td></tr>
+                <tr><th scope="row" class="left">STATS Taux de transformation</th><td class="left">Match › ${C.g("Joueurs", "Joueuses")} › Détail set par set (choisir « Taux … »)</td></tr>
                 <tr><th scope="row" class="left">Vérification avec score final</th><td class="left">Match › Synthèse › D’où viennent les points</td></tr>
                 <tr><th scope="row" class="left">Statistique équipe adverse</th><td class="left">Match › Synthèse › Ce qu’on laisse à l’adversaire</td></tr>
                 <tr><th scope="row" class="left">Légende</th><td class="left">« Comment compter » sur chaque geste, et ce tuto</td></tr>
               </tbody>
             </table></div>
-            <p class="muted small">Deux calculs diffèrent volontairement de l’ancien fichier : les totaux d’équipe comptent tous les joueurs (l’Excel en oubliait certains), et le taux d’un match est calculé sur tous les gestes plutôt qu’en moyenne des sets.</p>
+            <p class="muted small">Deux calculs diffèrent volontairement de l’ancien fichier : les totaux d’équipe comptent ${C.g("tous les joueurs", "toutes les joueuses")} (l’Excel en oubliait certains), et le taux d’un match est calculé sur tous les gestes plutôt qu’en moyenne des sets.</p>
           </section>
 
           <section class="card" id="tuto-coach">
             <h2 class="h-sec"><span class="sec-n">7</span>Ajouter sa fiche à l’Excel du coach</h2>
-            <p>Tant que le coach garde son fichier, chaque joueur peut y recopier sa fiche de l’app en <b>deux copier-coller</b>. La fiche téléchargée reprend exactement l’onglet du joueur chez le coach : mêmes lignes, mêmes colonnes, mêmes formules. Il suffit de coller au même endroit.</p>
+            <p>Tant que le coach garde son fichier, chaque ${J} peut y recopier sa fiche de l’app en <b>deux copier-coller</b>. La fiche téléchargée reprend exactement l’onglet ${C.g("du joueur", "de la joueuse")} chez le coach : mêmes lignes, mêmes colonnes, mêmes formules. Il suffit de coller au même endroit.</p>
             <${SheetMap} />
             <ol class="howto steps-coach">
-              <li><b>Télécharge la fiche.</b> À la fin de la saisie, onglet <i>Bilan</i> › « Télécharger la fiche Excel ». Le coach peut aussi la télécharger depuis <i>Match › Joueurs</i>, en touchant le nom du joueur. Le fichier s’appelle par exemple « ASVP - Adversaire - Prénom.xlsx ».</li>
+              <li><b>Télécharge la fiche.</b> À la fin de la saisie, onglet <i>Bilan</i> › « Télécharger la fiche Excel ». Le coach peut aussi la télécharger depuis <i>Match › ${C.g("Joueurs", "Joueuses")}</i>, en touchant le nom ${C.g("du joueur", "de la joueuse")}. Le fichier s’appelle par exemple « ${q.us()} - Adversaire - Prénom.xlsx ».</li>
               <li><b>Ouvre les deux fichiers</b> : la fiche téléchargée et l’Excel du coach, sur Excel ou sur Google Sheets.</li>
               <li><b>Copie les stats.</b> Dans la fiche, sélectionne les cases <code>E3</code> à <code>I30</code>. Le plus simple : tape <code>E3:I30</code> dans la zone Nom (en haut à gauche, à côté de la barre de formule), puis Entrée. Copie avec Ctrl+C (Cmd+C sur Mac).</li>
               <li><b>Colle chez le coach, sans la mise en forme.</b> Ouvre l’onglet à ton nom, clique sur la case <code>E3</code>, puis :
@@ -285,20 +289,20 @@
             <h2 class="h-sec"><span class="sec-n">8</span>Questions fréquentes</h2>
             <dl class="faq">
               <dt>On n’a pas la vidéo d’un match.</dt><dd>À la création (ou avec « Modifier »), coche « Pas de vidéo : score seulement » et renseigne le score. Le match est marqué NO VIDEO / NO DATA : il compte dans les victoires et les sets de la saison, sans fiches à remplir. Si la vidéo arrive plus tard, décoche l’option.</dd>
-              <dt>Certains joueurs remplissent encore l’Excel du coach.</dt><dd>Sur la page du match, « Compléter avec l’Excel » lit la feuille de match : les fiches présentes seulement dans l’Excel sont ajoutées, celles saisies dans l’app sont conservées. Si un joueur a une fiche dans les deux et que les chiffres diffèrent, rien n’est écrasé : il voit un message ATTENTION dans sa fiche et choisit « Prendre la version de l’Excel » ou « Garder ma saisie ». Tant que ce n’est pas tranché, l’accueil et la page du match l’indiquent en rouge.</dd>
+              <dt>${C.g("Certains joueurs", "Certaines joueuses")} remplissent encore l’Excel du coach.</dt><dd>Sur la page du match, « Compléter avec l’Excel » lit la feuille de match : les fiches présentes seulement dans l’Excel sont ajoutées, celles saisies dans l’app sont conservées. Si ${C.g("un joueur", "une joueuse")} a une fiche dans les deux et que les chiffres diffèrent, rien n’est écrasé : il voit un message ATTENTION dans sa fiche et choisit « Prendre la version de l’Excel » ou « Garder ma saisie ». Tant que ce n’est pas tranché, l’accueil et la page du match l’indiquent en rouge.</dd>
               <dt>Il manque des points par rapport au score final.</dt><dd>Ce n’est pas grave : ce sont des moments sans vidéo, ou des fautes de l’adversaire que la fiche ne note pas. Une fois le match marqué terminé, l’app les affiche comme « points non notés » et ne les comptabilise pas.</dd>
-              <dt>Je n’ai pas joué ce match.</dt><dd>Sur la page du match, « Modifier », puis décoche ton nom dans « Joueurs du match » : l’app ne te demande plus ta fiche. Si une fiche existait déjà à ton nom, elle est mise de côté et ne compte plus ; recoche ton nom pour la retrouver.</dd>
-              <dt>Un joueur n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
+              <dt>Je n’ai pas joué ce match.</dt><dd>Sur la page du match, « Modifier », puis décoche ton nom dans « ${C.g("Joueurs du match", "Joueuses du match")} » : l’app ne te demande plus ta fiche. Si une fiche existait déjà à ton nom, elle est mise de côté et ne compte plus ; recoche ton nom pour la retrouver.</dd>
+              <dt>${C.g("Un joueur", "Une joueuse")} n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
               <dt>J’ai touché la mauvaise case.</dt><dd>Le − dans le coin de la case retire 1 ; « Annuler » en bas efface la dernière touche.</dd>
-              <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : sur PC, la vidéo s’affiche à côté des cases. Avec « Joueur suivant », une seule personne saisit toute l’équipe en revoyant le match.</dd>
-              <dt>Un joueur ne sait pas s’il doit compter une action.</dt><dd>« Comment compter », à côté de chaque geste, donne la définition de chaque résultat.</dd>
-              <dt>Une compo type, c’est quoi ?</dt><dd>Une compo enregistrée une fois pour toutes dans l’onglet Équipe (six de départ, libéro, binômes, commentaire). Dans la compo d’un match, « Partir d’une compo type » la recopie ; « Garder cette compo comme compo type » fait l’inverse.</dd>
-              <dt>C’est quoi les binômes ?</dt><dd>Deux joueurs aux profils proches : dans une compo (ou une compo type), le coach associe à un joueur du terrain son remplaçant naturel, avec « + binôme » dans sa case. Le binôme s’affiche sur le terrain, chez les remplaçants et dans la liste des convoqués.</dd>
-              <dt>Comment le classement se met-il à jour ?</dt><dd>Tout seul, chaque matin : GitHub lit la poule sur le site de la FFVolley et l’envoie à l’app. Pour l’avoir tout de suite après un match : sur GitHub, onglet Actions, « Championnat FFVolley », « Run workflow ». Le serveur de l’app ne peut pas lire ce site lui-même (offre gratuite de l’hébergeur).</dd>
-              <dt>Le match du championnat est passé mais il n’est pas dans la liste.</dt><dd>Ouvre-le depuis le calendrier ou le Classement (fiche de l’adversaire) : « Créer ce match dans l’app pour la saisie » le crée avec la date, l’heure et le score officiel.</dd>
+              <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : sur PC, la vidéo s’affiche à côté des cases. Avec « ${C.g("Joueur suivant", "Joueuse suivante")} », une seule personne saisit toute l’équipe en revoyant le match.</dd>
+              <dt>${C.g("Un joueur ne sait pas s’il doit", "Une joueuse ne sait pas si elle doit")} compter une action.</dt><dd>« Comment compter », à côté de chaque geste, donne la définition de chaque résultat.</dd>
+              <dt>Une compo type, c’est quoi ?</dt><dd>Une compo enregistrée une fois pour toutes dans l’onglet Équipe (${SIX ? "six de départ, libéro" : "quatre de départ"}, binômes, commentaire). Dans la compo d’un match, « Partir d’une compo type » la recopie ; « Garder cette compo comme compo type » fait l’inverse.</dd>
+              <dt>C’est quoi les binômes ?</dt><dd>${C.g("Deux joueurs aux profils proches", "Deux joueuses aux profils proches")} : dans une compo (ou une compo type), le coach associe ${C.g("à un joueur du terrain son remplaçant naturel", "à une joueuse du terrain sa remplaçante naturelle")}, avec « + binôme » dans sa case. Le binôme s’affiche sur le terrain, ${C.g("chez les remplaçants", "chez les remplaçantes")} et dans la liste des convoqués.</dd>
+              ${LEAGUE && html`<dt>Comment le classement se met-il à jour ?</dt><dd>Tout seul, chaque matin : GitHub lit la poule sur le site de la FFVolley et l’envoie à l’app. Pour l’avoir tout de suite après un match : sur GitHub, onglet Actions, « Championnat FFVolley », « Run workflow ». Le serveur de l’app ne peut pas lire ce site lui-même (offre gratuite de l’hébergeur).</dd>
+              <dt>Le match du championnat est passé mais il n’est pas dans la liste.</dt><dd>Ouvre-le depuis le calendrier ou le Classement (fiche de l’adversaire) : « Créer ce match dans l’app pour la saisie » le crée avec la date, l’heure et le score officiel.</dd>`}
               <dt>Installer l’app sur son téléphone.</dt><dd>Ouvre le lien de l’app, puis : sur Samsung Internet, menu ≡ › « Ajouter la page à » › « Écran d’accueil » ; sur Chrome (Android), menu ⋮ › « Ajouter à l’écran d’accueil » ou « Installer l’application » ; sur iPhone (Safari), bouton Partager › « Sur l’écran d’accueil ». L’app apparaît avec le blason de l’équipe et s’ouvre en plein écran. Un appui long sur l’icône (Android) propose « Classement » et « Nouveau match ».</dd>
               <dt>Où vont les données ?</dt><dd>${store.mode === "local" ? "Sur cet appareil uniquement (mode hors ligne). Exporte l’Excel pour les transmettre." : "Dans la base de l’équipe : tout le monde voit la même chose, sans fichier à s’échanger."}</dd>
-              <dt>Le coach veut toujours son fichier Excel.</dt><dd>Bouton « Excel » sur la page du match : il produit le fichier au format habituel. Ou chaque joueur colle sa fiche dans le fichier du coach (partie 7).</dd>
+              <dt>Le coach veut toujours son fichier Excel.</dt><dd>Bouton « Excel » sur la page du match : il produit le fichier au format habituel. Ou chaque ${J} colle sa fiche dans le fichier du coach (partie 7).</dd>
             </dl>
           </section>
         </div>

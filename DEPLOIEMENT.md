@@ -132,7 +132,27 @@ le site FFVolley) : `python stator/ffvb.py --app … --poule "ADRESSE"`. Une aut
 règle dans GitHub : *Settings* › *Secrets and variables* › *Actions* › *Variables*, variable
 `STATOR_URL`.
 
+## 7. Profil coach et équipe féminine 4x4
+
+L'équipe féminine 4x4 est servie par la même app, à l'adresse `https://TON_PSEUDO.eu.pythonanywhere.com/f4/`,
+avec sa propre base `instance/stator-f4.db` (créée vide au premier lancement, sauvegardée par le
+même script : copier aussi ce fichier lors des sauvegardes chez soi). Rien à configurer dans l'onglet Web.
+
+**Créer le profil coach** (une fois ; à refaire pour changer le mot de passe), console Bash :
+
+```bash
+cd ~/ASVP_STATOR && workon stator
+python -m stator.coach        # demande le nom affiché et le mot de passe (8 caractères au moins)
+```
+
+Le profil est dans `instance/coach.json` (empreinte du mot de passe, jamais le mot de passe lui-même) ;
+la clé qui signe la connexion est dans `instance/secret_key`, créée toute seule. Changer le mot de passe
+déconnecte le coach partout. Après 5 essais ratés, la connexion est bloquée 5 minutes.
+
+Le site est en HTTPS : ajouter `os.environ["STATOR_HTTPS"] = "1"` en haut du fichier WSGI (avant
+`from stator import create_app`) pour que le cookie de connexion ne circule qu'en HTTPS.
+
 ## À savoir avant d'ouvrir l'app à l'équipe
 
-L'app n'a pas encore de mot de passe : toute personne qui a le lien peut modifier ou supprimer
-des matchs. Ajouter un mot de passe d'équipe avant de partager l'adresse.
+Seul le coach a un mot de passe (sélecteur d'équipe) : toute personne qui a le lien d'une équipe
+peut modifier ou supprimer ses matchs. Ajouter un mot de passe d'équipe avant de partager l'adresse.

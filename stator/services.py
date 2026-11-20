@@ -7,6 +7,8 @@ import re
 import unicodedata
 from datetime import date, datetime
 
+from flask import current_app
+
 from .models import Match, Player, SetScore, Setting, StatCount, StatSheet, db, utcnow
 from .referentiel import field_ids
 
@@ -180,21 +182,29 @@ def _pairs(items, ids: set[str]) -> list[list[str]]:
     return [list(p) for p in items]
 
 
+def _format() -> int:
+    """Nombre de joueurs sur le terrain pour l'équipe servie : 6 (6x6, avec libéro) ou 4 (4x4, sans libéro)."""
+    return int((current_app.config.get("STATOR_TEAM") or {}).get("format") or 6)
+
+
 def _lineup(item, ids: set[str] | None = None) -> dict:
-    """Une compo : libellé, joueurs en positions 1 à 6, libéro, binômes, commentaire du coach."""
+    """Une compo : libellé, joueurs en positions 1 à 6 (1 à 4 en 4x4), libéro en 6x6, binômes, commentaire."""
     if not isinstance(item, dict):
         raise InvalidData("Compo invalide.")
     label = item.get("label") or ""
     comment = item.get("comment") or ""
     if not isinstance(label, str) or len(label) > 40 or not isinstance(comment, str) or len(comment) > 1000:
         raise InvalidData("Compo : libellé de 40 caractères et commentaire de 1000 caractères au plus.")
+    n = _format()
     positions = item.get("positions") or {}
-    if not isinstance(positions, dict) or not set(positions) <= {"1", "2", "3", "4", "5", "6"}:
-        raise InvalidData("Compo : positions 1 à 6 attendues.")
+    if not isinstance(positions, dict) or not set(positions) <= {str(i) for i in range(1, n + 1)}:
+        raise InvalidData(f"Compo : positions 1 à {n} attendues.")
     placed = {k: _check_id(v, "joueur") for k, v in positions.items() if v}
     if len(set(placed.values())) != len(placed):
         raise InvalidData("Compo : un joueur ne peut occuper qu'une position.")
     libero = item.get("libero") or ""
+    if libero and n != 6:
+        raise InvalidData("Compo : pas de libéro en 4x4.")
     if libero:
         _check_id(libero, "joueur")
         if libero in placed.values():

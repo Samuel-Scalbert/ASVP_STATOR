@@ -3,7 +3,7 @@
   "use strict";
   const { html, render, useState, useEffect, Component } = root.htmPreact;
   const C = root.StatorCore;
-  const { store, q, init, lsGet, lsSet } = root.StatorStore;
+  const { store, q, api, init, lsGet, lsSet } = root.StatorStore;
   const U = root.StatorUI;
   const M = root.StatorMatch;
   const S = root.StatorSeason;
@@ -18,7 +18,7 @@
     { view: "season", label: "Saison", icon: "chart", hash: "saison" },
     { view: "tuto", label: "Tuto", icon: "book", hash: "tuto" },
     { view: "team", label: "Équipe", icon: "users", hash: "equipe" },
-  ];
+  ].filter((n) => n.view !== "league" || C.TEAM.league); // pas de classement sans championnat suivi (voir stator/teams.py)
   const ROUTE_KEY = "asvp-stator-route";
   function routeFromHash() {
     const raw = (root.location.hash || "").replace("#", "");
@@ -65,7 +65,43 @@
     </button>`;
   }
   function Logo({ size }) {
-    return html`<img class="logo" src="img/logo-asvp.png" alt="" width=${size} height=${Math.round(size * 1.2)} />`;
+    return html`<img class="logo" src=${C.TEAM.logo} alt="" width=${size} height=${Math.round(size * 1.2)} />`;
+  }
+
+  /* ---------- Profil coach : connexion, puis passage d’une de ses équipes à l’autre ---------- */
+  const coachOf = () => (store.coach && store.coach.coach) || null;
+  function CoachLogin({ onDone }) {
+    const [pw, setPw] = useState("");
+    const [err, setErr] = useState("");
+    const [busy, setBusy] = useState(false);
+    const submit = async (e) => {
+      e.preventDefault();
+      if (!pw || busy) return;
+      setBusy(true);
+      const msg = await api.coachLogin(pw);
+      setBusy(false);
+      if (msg) { setErr(msg); return; }
+      onDone();
+    };
+    return html`<form class="coach-login" onSubmit=${submit}>
+      <p class="muted">Réservé au coach : son mot de passe lui ouvre toutes ses équipes, avec un sélecteur pour passer de l’une à l’autre.</p>
+      <div class="field"><label for="coach-pw"><b>Mot de passe du coach</b></label>
+        <input id="coach-pw" type="password" autocomplete="current-password" value=${pw} onInput=${(e) => { setPw(e.target.value); setErr(""); }} data-autofocus /></div>
+      ${err && html`<p class="form-err" role="alert">${err}</p>`}
+      <div class="row-btns end"><button class="btn primary" type="submit" disabled=${!pw || busy}><${Icon} name="lock" size=${18} />${busy ? "Connexion…" : "Se connecter"}</button></div>
+    </form>`;
+  }
+  /* Les équipes du coach : l’équipe affichée est cochée, les autres s’ouvrent à leur adresse. */
+  function CoachTeams({ onLogout }) {
+    const c = coachOf();
+    if (!c) return null;
+    return html`<div class="coach-teams">
+      <span class="me-k">Coach · ${c.name}</span>
+      <ul>${c.teams.map((t) => html`<li key=${t.key}>${t.current
+        ? html`<span class="coach-team on" aria-current="true"><img src=${t.logo} alt="" width="22" height="26" /><span>${t.name}</span><${Icon} name="check" size=${16} /></span>`
+        : html`<a class="coach-team" href=${t.url}><img src=${t.logo} alt="" width="22" height="26" /><span>${t.name}</span><${Icon} name="swap" size=${16} /></a>`}</li>`)}</ul>
+      <button type="button" class="coach-out" onClick=${onLogout}>Se déconnecter</button>
+    </div>`;
   }
 
   function App({ boot }) {
@@ -106,6 +142,7 @@
     const meValid = me && q.roster().some((p) => p.id === me) ? me : null;
 
     let view = route.view;
+    if (view === "league" && !C.TEAM.league) view = "home";
     if ((view === "entry" || view === "match") && store.ready && !store.matches[route.matchId]) view = "home";
     if (view === "entry" && (!meValid || store.readOnly)) view = store.ready ? "match" : view;
     const em = store.ready && store.matches[route.matchId];
@@ -135,7 +172,7 @@
     if (sheet) {
       if (sheet.type === "help") sheetEl = html`<${Sheet} title=${"Comment compter : " + C.SKILL[sheet.sk].long} onClose=${close}><${M.SkillHelp} sk=${sheet.sk} /><//>`;
       else if (sheet.type === "who") sheetEl = html`<${Sheet} title="Qui es-tu ?" onClose=${close}>
-        <p class="muted">Choisis ton nom : il reste mémorisé sur cet appareil. Tu peux aussi remplir la fiche d’un coéquipier.</p>
+        <p class="muted">Choisis ton nom : il reste mémorisé sur cet appareil. Tu peux aussi remplir la fiche d’${C.g("un coéquipier", "une coéquipière")}.</p>
         <${M.WhoGrid} me=${meValid} onPick=${(id) => { setMe(id); close(); if (sheet.then) { setRoute(sheet.then); root.scrollTo(0, 0); } }} /><//>`;
       else if (sheet.type === "match-form") {
         const upcoming = sheet.m ? q.isUpcoming(sheet.m) : !!sheet.upcoming;
@@ -152,23 +189,28 @@
       }
       else if (sheet.type === "import") sheetEl = html`<${Sheet} title="Importer un Excel de match" onClose=${close}>
         <${S.ImportSheet} onDone=${(m) => { close(); U.toast("Match importé."); go({ view: "match", matchId: m.id }); }} /><//>`;
-      else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · ASVP – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
-      else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · ASVP – " + sheet.m.opponent} onClose=${close} wide>
+      else if (sheet.type === "player") sheetEl = html`<${Sheet} title=${sheet.p.name + " · " + q.us() + " – " + sheet.m.opponent} onClose=${close} wide><${M.PlayerDetail} p=${sheet.p} m=${sheet.m} /><//>`;
+      else if (sheet.type === "excel-merge") sheetEl = html`<${Sheet} title=${"Compléter avec l’Excel · " + q.us() + " – " + sheet.m.opponent} onClose=${close} wide>
         <${M.ExcelMerge} m=${sheet.m} onDone=${(r) => { close(); U.toast(U.plural(r.added, "fiche ajoutée", "fiches ajoutées") + (r.conflicts ? " · " + U.plural(r.conflicts, "différence", "différences") + " à trancher (ATTENTION)" : "") + "."); }} /><//>`;
-      else if (sheet.type === "lineup") sheetEl = html`<${Sheet} title=${sheet.m ? "Compo du coach · ASVP – " + sheet.m.opponent : sheet.template ? "Compo type · " + sheet.template.name : "Nouvelle compo type"} onClose=${close} wide>
+      else if (sheet.type === "lineup") sheetEl = html`<${Sheet} title=${sheet.m ? "Compo du coach · " + q.us() + " – " + sheet.m.opponent : sheet.template ? "Compo type · " + sheet.template.name : "Nouvelle compo type"} onClose=${close} wide>
         <${P.LineupEditor} m=${sheet.m} template=${sheet.template} onDone=${(n) => { close(); U.toast(sheet.m ? (n ? "Compo enregistrée." : "Compo effacée.") : "Compo type enregistrée."); }} /><//>`;
-      else if (sheet.type === "consignes") sheetEl = html`<${Sheet} title=${"Consignes du coach · ASVP – " + sheet.m.opponent} onClose=${close}>
+      else if (sheet.type === "consignes") sheetEl = html`<${Sheet} title=${"Consignes du coach · " + q.us() + " – " + sheet.m.opponent} onClose=${close}>
         <${P.ConsignesEditor} m=${sheet.m} onDone=${(n) => { close(); U.toast(n ? "Consignes enregistrées." : "Consignes effacées."); }} /><//>`;
       else if (sheet.type === "team") sheetEl = html`<${Sheet} title=${sheet.team} onClose=${close} wide>
         <${LG.TeamSheet} team=${sheet.team} go=${(r) => { close(); go(r); }} openSheet=${openSheet} /><//>`;
+      else if (sheet.type === "coach-login") sheetEl = html`<${Sheet} title="Espace coach" onClose=${close}>
+        <${CoachLogin} onDone=${() => { close(); U.toast("Connecté : le sélecteur d’équipe est dans le menu."); }} /><//>`;
+      else if (sheet.type === "coach") sheetEl = html`<${Sheet} title="Mes équipes" onClose=${close}>
+        <${CoachTeams} onLogout=${() => { close(); api.coachLogout(); }} /><//>`;
       else if (sheet.type === "delete") sheetEl = html`<${Sheet} title="Supprimer le match" onClose=${close}>
         <${M.DeleteMatch} m=${sheet.m} onCancel=${close} onDone=${() => { close(); U.toast("Match supprimé."); go({ view: "home" }); }} /><//>`;
     }
 
-    const team = (store.config && store.config.team) || "ASVP";
+    const team = (store.config && store.config.team) || (C.TEAM.key === "asvp" ? "ASVP" : C.TEAM.name);
+    const coach = coachOf();
     return html`<div class=${cx("app", view === "entry" && "in-entry")}>
       <aside class="side" aria-label="Navigation">
-        <button class="side-brand" onClick=${() => go({ view: "home" })} aria-label="ASVP Stator, accueil">
+        <button class="side-brand" onClick=${() => go({ view: "home" })} aria-label=${C.TEAM.app + ", accueil"}>
           <${Logo} size=${112} />
           <span class="side-team">${team === "ASVP" ? html`ASVP <b>Alsa Team</b>` : team}</span>
           <span class="side-app">Stator · stats de match</span>
@@ -177,9 +219,11 @@
           ${NAV.map((n) => html`<button key=${n.view} class=${cx("side-link", active === n.view && "on")} aria-current=${active === n.view ? "page" : null} onClick=${() => go({ view: n.view })}><${Icon} name=${n.icon} size=${20} /><span>${n.label}</span></button>`)}
         </nav>
         <div class="side-foot">
+          ${coach ? html`<${CoachTeams} onLogout=${() => api.coachLogout()} />`
+            : store.coach && store.coach.available ? html`<button type="button" class="coach-in" onClick=${() => setSheet({ type: "coach-login" })}><${Icon} name="lock" size=${15} />Espace coach</button>` : null}
           <${ThemeToggle} />
-          <button class="me-chip" onClick=${() => setSheet({ type: "who" })} aria-label="Changer de joueur">
-            <span class="me-k">${meValid ? "Connecté en tant que" : "Pour saisir"}</span><span class="me-v">${meValid ? q.name(meValid) : "Qui es-tu ?"}</span></button>
+          <button class="me-chip" onClick=${() => setSheet({ type: "who" })} aria-label=${C.g("Changer de joueur", "Changer de joueuse")}>
+            <span class="me-k">${meValid ? C.g("Connecté en tant que", "Connectée en tant que") : "Pour saisir"}</span><span class="me-v">${meValid ? q.name(meValid) : "Qui es-tu ?"}</span></button>
           <${SyncBadge} />
           ${store.app && store.app.version && html`<span class="app-version" title="Version de l’app sur ce serveur (comparer avec le dernier commit sur GitHub)">
             Version ${store.app.version}${store.app.commit ? " · " + store.app.commit : ""}</span>`}
@@ -187,10 +231,11 @@
       </aside>
       ${view !== "entry" && html`<header class="topbar">
         <div class="topbar-in">
-          <button class="brand" onClick=${() => go({ view: "home" })} aria-label="ASVP Stator, accueil"><${Logo} size=${30} /><span>ASVP <b>Stator</b></span></button>
+          <button class="brand" onClick=${() => go({ view: "home" })} aria-label=${C.TEAM.app + ", accueil"}><${Logo} size=${30} /><span>${q.us()} <b>Stator</b></span></button>
           <${SyncBadge} />
+          ${coach && html`<button type="button" class="icon-btn on-band coach-switch" onClick=${() => setSheet({ type: "coach" })} aria-label="Changer d’équipe (coach)" title="Changer d’équipe"><${Icon} name="swap" size=${20} /></button>`}
           <${ThemeToggle} compact />
-          <button class="me-chip" onClick=${() => setSheet({ type: "who" })} aria-label="Changer de joueur">${meValid ? q.name(meValid) : "Qui es-tu ?"}</button>
+          <button class="me-chip" onClick=${() => setSheet({ type: "who" })} aria-label=${C.g("Changer de joueur", "Changer de joueuse")}>${meValid ? q.name(meValid) : "Qui es-tu ?"}</button>
         </div>
       </header>`}
       <main class="main">

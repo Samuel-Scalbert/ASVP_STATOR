@@ -1,5 +1,6 @@
 /* ASVP Stator — préparation d’un match par le coach : compo sur le terrain, compos types, binômes, consignes,
-   page du match à venir. Une compo = six joueurs sur le terrain et un libéro ; c’est une compo fixe, sans rotation. */
+   page du match à venir. Une compo = six joueurs sur le terrain et un libéro (6x6), ou quatre joueuses sans libéro
+   (4x4 : en losange) ; c’est une compo fixe, sans rotation. */
 (function (root) {
   "use strict";
   const { html, useState } = root.htmPreact;
@@ -9,12 +10,20 @@
   const { Icon, cx, plural, fmtDate, fmtTime, TeamLogo } = U;
 
   /* ---------- Modèle ---------- */
-  // Les six places du terrain, vues de notre fond : trois au filet, trois à l’arrière.
-  const SLOTS = [
+  // Les places du terrain, vues de notre fond. 6x6 : trois au filet, trois à l’arrière, le libéro à côté.
+  // 4x4 : en losange, sans libéro. Pointe avant au filet (poste 3), deux ailes (4 à gauche, 2 à droite),
+  // pointe arrière (poste 1). col : colonne de la case dans la grille de trois.
+  const SIX = C.TEAM.format !== 4;
+  const SLOTS = SIX ? [
     { p: 4, row: "front", label: "Filet · gauche" }, { p: 3, row: "front", label: "Filet · centre" }, { p: 2, row: "front", label: "Filet · droite" },
     { p: 5, row: "back", label: "Arrière · gauche" }, { p: 6, row: "back", label: "Arrière · centre" }, { p: 1, row: "back", label: "Arrière · droite" },
+  ] : [
+    { p: 3, row: "front", col: 2, label: "Pointe avant" },
+    { p: 4, row: "mid", col: 1, label: "Aile gauche" }, { p: 2, row: "mid", col: 3, label: "Aile droite" },
+    { p: 1, row: "back", col: 2, label: "Pointe arrière" },
   ];
-  const POS = [1, 2, 3, 4, 5, 6];
+  const POS = SLOTS.map((s) => s.p).sort();
+  const STARTERS = (SIX ? "les six de départ" : "les quatre de départ") + (SIX ? " et le libéro" : "");
   const ROLE_ORDER = ["passeur", "pointu", "r4", "central", "libero"];
   const roleLabel = (k) => { const r = C.ROLES.find((x) => x.k === k); return r ? r.label : ""; };
   const posteOf = (id) => { const p = q.roster().find((x) => x.id === id); return (p && p.poste) || ""; };
@@ -53,9 +62,9 @@
       const paired = new Set([].concat.apply([], lu.pairs || []));
       const candidates = players.filter((p) => !on.includes(p.id) && !paired.has(p.id))
         .sort((x, y) => (posteOf(x.id) === poste ? 0 : 1) - (posteOf(y.id) === poste ? 0 : 1));
-      return html`<div class=${cx("vb-pos edit", "pos-" + (poste || "none"), id && "set", libero && "lib")}>
+      return html`<div class=${cx("vb-pos edit", "pos-" + (poste || "none"), id && "set", libero && "lib", slot.col && "col-" + slot.col)}>
         <span class="vb-head">${head}</span>
-        <select value=${id || ""} aria-label=${libero ? "Libéro" : "Joueur " + slot.label.toLowerCase()} onChange=${(e) => onPick(e.target.value)}>
+        <select value=${id || ""} aria-label=${libero ? "Libéro" : C.g("Joueur ", "Joueuse ") + slot.label.toLowerCase()} onChange=${(e) => onPick(e.target.value)}>
           <option value="">— libre —</option>
           ${libero
             ? opts[0].players.map((x) => html`<option key=${x.id} value=${x.id}>${x.name}</option>`)
@@ -70,7 +79,7 @@
             </select>` : null}
       </div>`;
     }
-    return html`<div class=${cx("vb-pos", "pos-" + (id ? poste || "none" : "empty"), libero && "lib")}>
+    return html`<div class=${cx("vb-pos", "pos-" + (id ? poste || "none" : "empty"), libero && "lib", slot && slot.col && "col-" + slot.col)}>
       <span class="vb-head">${head}</span>
       <b class="vb-name">${id ? q.name(id) : "—"}</b>
       ${partner ? html`<small class="vb-pair" title="Binôme"><${Icon} name="swap" size=${12} />${q.name(partner)}</small>` : null}
@@ -79,13 +88,14 @@
   /* Le terrain vu de notre fond, filet en haut ; le libéro à côté, à la hauteur de la rangée arrière. */
   function Court({ lu, editor, onPick, onPair, players }) {
     const tile = (s) => html`<${Tile} key=${s.p} slot=${s} id=${lu.positions[s.p] || ""} editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick(s.p, id)} onPair=${onPair} />`;
-    return html`<div class="vb-wrap">
+    return html`<div class=${cx("vb-wrap", !SIX && "four")}>
       <div class="vb-court" role="group" aria-label="Terrain">
         <div class="vb-net"><span>Filet</span></div>
         <div class="vb-row">${SLOTS.filter((s) => s.row === "front").map(tile)}</div>
         <div class="vb-attack"><span>3 m</span></div>
+        ${!SIX && html`<div class="vb-row mid">${SLOTS.filter((s) => s.row === "mid").map(tile)}</div>`}
         <div class="vb-row back">${SLOTS.filter((s) => s.row === "back").map(tile)}
-          <div class="vb-libero"><${Tile} slot=${{ label: "Libéro" }} id=${lu.libero || ""} libero editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick("libero", id)} onPair=${onPair} /></div>
+          ${SIX && html`<div class="vb-libero"><${Tile} slot=${{ label: "Libéro" }} id=${lu.libero || ""} libero editor=${editor} players=${players} lu=${lu} onPick=${(id) => onPick("libero", id)} onPair=${onPair} /></div>`}
         </div>
       </div>
     </div>`;
@@ -94,7 +104,7 @@
     const list = bench(lu, players);
     if (!list.length) return null;
     return html`<div class="vb-bench">
-      <span class="eyebrow">Remplaçants</span>
+      <span class="eyebrow">${C.g("Remplaçants", "Remplaçantes")}</span>
       <ul>${list.map((p) => html`<li key=${p.id} class=${"pos-" + (p.poste || "none")}><span class="vb-dot"></span><b>${p.name}</b><small>${roleLabel(p.poste) || ""}</small>${p.partner ? html`<span class="vb-pair" title="Binôme"><${Icon} name="swap" size=${13} />${q.name(p.partner)}</span>` : null}</li>`)}</ul>
     </div>`;
   }
@@ -158,24 +168,27 @@
     const templates = q.templates();
     return html`<div class="lineup-editor">
       ${isTemplate
-        ? html`<div class="field"><label for="tpl-name"><b>Nom de la compo type</b><small>ex. Équipe type, Sans Kévin, 6 avec 2 passeurs</small></label><input id="tpl-name" value=${name} maxlength="40" onInput=${(e) => setName(e.target.value)} data-autofocus /></div>`
+        ? html`<div class="field"><label for="tpl-name"><b>Nom de la compo type</b><small>${SIX ? "ex. Équipe type, Sans Kévin, 6 avec 2 passeurs" : "ex. Équipe type, Sans la passeuse titulaire"}</small></label><input id="tpl-name" value=${name} maxlength="40" onInput=${(e) => setName(e.target.value)} data-autofocus /></div>`
         : html`
         <div class="lu-tabs" role="tablist">
           ${lineups.map((x, i) => html`<button type="button" key=${i} role="tab" aria-selected=${i === cur} class=${cx("lu-tab", i === cur && "on")} onClick=${() => setCur(i)}>${x.label || "Compo " + (i + 1)}</button>`)}
           ${lineups.length < 4 && html`<button type="button" class="lu-tab add" onClick=${add} aria-label="Ajouter une compo"><${Icon} name="plus" size=${14} />Compo</button>`}
         </div>
         <div class="field-row">
-          <div class="field"><label for="lu-label"><b>Nom de la compo</b><small>ex. Set 1, Si Kévin absent</small></label><input id="lu-label" value=${lu.label || ""} maxlength="40" onInput=${(e) => update({ label: e.target.value })} /></div>
+          <div class="field"><label for="lu-label"><b>Nom de la compo</b><small>${SIX ? "ex. Set 1, Si Kévin absent" : "ex. Set 1, Si une titulaire est absente"}</small></label><input id="lu-label" value=${lu.label || ""} maxlength="40" onInput=${(e) => update({ label: e.target.value })} /></div>
           <div class="field"><label for="lu-tpl"><b>Partir d’une compo type</b><small>${templates.length ? "réglées dans l’onglet Équipe" : "aucune pour l’instant (onglet Équipe)"}</small></label>
             <div class="add-row">
               <select id="lu-tpl" value=${tplChoice} disabled=${!templates.length} onChange=${(e) => setTplChoice(e.target.value)}><option value="">${templates.length ? "Choisir…" : "—"}</option>${templates.map((t) => html`<option key=${t.id} value=${t.id}>${t.name}</option>`)}</select>
               <button type="button" class="btn ghost sm" disabled=${!tplChoice} onClick=${() => { apply(templates.find((t) => t.id === tplChoice)); U.toast("Compo type appliquée."); }}>Appliquer</button>
             </div></div>
         </div>`}
-      <p class="muted small">Place les six joueurs sur le terrain et le libéro à côté (les listes sont rangées par poste). « + binôme » sous un joueur lui associe un remplaçant au profil proche.</p>
+      <p class="muted small">${SIX
+        ? "Place les six joueurs sur le terrain et le libéro à côté (les listes sont rangées par poste). « + binôme » sous un joueur lui associe un remplaçant au profil proche."
+        : C.g("Place les quatre joueurs sur le terrain, en losange : pointe avant au filet, deux ailes, pointe arrière (les listes sont rangées par poste). « + binôme » sous un joueur lui associe un remplaçant au profil proche.",
+          "Place les quatre joueuses sur le terrain, en losange : pointe avant au filet, deux ailes, pointe arrière (les listes sont rangées par poste). « + binôme » sous une joueuse lui associe une remplaçante au profil proche.")}</p>
       <${Court} lu=${lu} editor players=${players} onPick=${pick} onPair=${pair} />
       <div class="field"><label for="lu-comment"><b>Commentaire du coach</b><small>sur cette compo</small></label>
-        <textarea id="lu-comment" rows="3" maxlength="1000" value=${lu.comment || ""} onInput=${(e) => update({ comment: e.target.value })} placeholder="ex. Kévin et Lucas permutent si la réception souffre"></textarea></div>
+        <textarea id="lu-comment" rows="3" maxlength="1000" value=${lu.comment || ""} onInput=${(e) => update({ comment: e.target.value })} placeholder=${SIX ? "ex. Kévin et Lucas permutent si la réception souffre" : "ex. On permute à l’arrière si la réception souffre"}></textarea></div>
       ${!isTemplate && html`<div class="field lu-saveas"><span class="lbl"><b>Garder cette compo comme compo type</b><small>pour la réutiliser sur d’autres matchs</small></span>
         <div class="add-row"><input value=${saveAs} maxlength="40" placeholder="Nom de la compo type" aria-label="Nom de la compo type" onInput=${(e) => setSaveAs(e.target.value)} />
           <button type="button" class="btn ghost sm" disabled=${!saveAs.trim() || !onCourt(lu).length} onClick=${() => { saveTemplate(saveAs); setSaveAs(""); U.toast("Compo type « " + saveAs.trim() + " » enregistrée."); }}>Enregistrer la compo type</button></div></div>`}
@@ -236,7 +249,7 @@
         ${lineups.length > 1 && html`<div class="lu-tabs" role="tablist">${lineups.map((x, i) => html`<button type="button" key=${i} role="tab" aria-selected=${i === cur} class=${cx("lu-tab", i === cur && "on")} onClick=${() => setCur(i)}>${x.label || "Compo " + (i + 1)}</button>`)}</div>`}
         ${lineups.length === 1 && lu.label ? html`<span class="eyebrow">${lu.label}</span>` : null}
         <${LineupView} lu=${lu} players=${players} key=${cur} />`
-        : html`<p class="muted">${compact ? "Pas de compo enregistrée pour ce match." : "Le coach n’a pas encore annoncé sa compo. Les six de départ et le libéro s’afficheront ici, sur le terrain, avec les remplaçants et les binômes."}</p>`}
+        : html`<p class="muted">${compact ? "Pas de compo enregistrée pour ce match." : "Le coach n’a pas encore annoncé sa compo. " + STARTERS.charAt(0).toUpperCase() + STARTERS.slice(1) + " s’afficheront ici, sur le terrain, avec " + C.g("les remplaçants", "les remplaçantes") + " et les binômes."}</p>`}
     </section>`;
   }
   const hasPrep = (m) => !!((m.lineups && m.lineups.length) || (m.consignes && m.consignes.length));
@@ -266,7 +279,7 @@
           <button class="icon-btn on-band" onClick=${() => go({ view: "home" })} aria-label="Retour aux matchs"><${Icon} name="back" /></button>
           <div class="mb-main">
             <span class="eyebrow on-band">Match à venir · ${k === 0 ? "aujourd’hui" : k === 1 ? "demain" : "J-" + k}${m.competition ? " · " + m.competition : ""}</span>
-            <div class="board sm"><span class="board-team"><${TeamLogo} name="ASVP" size=${36} />ASVP</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
+            <div class="board sm"><span class="board-team"><${TeamLogo} us size=${36} />${q.us()}</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
             <div class="up-when">
               <span class="up-date"><${Icon} name="cal" size=${18} />${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long" })}${m.time ? html` · <b>${fmtTime(m.time)}</b>` : html` · <i>heure à préciser</i>`}</span>
               <span class="up-warm"><${Icon} name="ball" size=${18} />Échauffement ${warm ? html`à <b>${fmtTime(warm)}</b>` : html`<b>1 h avant</b>`}</span>
@@ -277,7 +290,7 @@
         <div class="match-actions">
           ${!store.readOnly && html`<button class="btn primary sm" onClick=${() => openSheet({ type: "consignes", m })}><${Icon} name="flag" size=${16} />${m.consignes && m.consignes.length ? "Modifier les consignes" : "Écrire les consignes"}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "lineup", m })}><${Icon} name="grid" size=${16} />${m.lineups && m.lineups.length ? "Modifier la compo" : "Faire la compo"}</button>`}
-          ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Date, lieu, joueurs</button>`}
+          ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Date, lieu, ${C.g("joueurs", "joueuses")}</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "delete", m })} aria-label="Supprimer le match"><${Icon} name="trash" size=${16} /></button>`}
         </div>
       </section>
@@ -294,7 +307,7 @@
               <div><dt>Quand</dt><dd><b>${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</b>${m.time ? html`, match à ${fmtTime(m.time)}` : html`, <span class="warn">heure à préciser</span>`}</dd></div>
               <div><dt>Chauffe</dt><dd>${warm ? html`<b>${fmtTime(warm)}</b>, ` : ""}une heure avant le match : on arrive en tenue.</dd></div>
               <div><dt>Où</dt><dd>${gym ? html`<b>${gym.name}</b>${gym.address ? html`<br />${gym.address}` : null}<br /><a class="btn ghost sm up-maps" href=${gym.maps} target="_blank" rel="noopener noreferrer"><${Icon} name="pin" size=${15} />Itinéraire</a>` : html`${venueLabel(m.venue) || html`<span class="warn">Lieu à préciser</span>`}${m.venue === "ext" ? html` <span class="muted">· salle à confirmer</span>` : null}`}</dd></div>
-              ${info && (info.ourColors || info.theirColors) ? html`<div><dt>Maillots</dt><dd>ASVP <b>${(info.ourColors || "?").toLowerCase()}</b> · ${m.opponent} <b>${(info.theirColors || "?").toLowerCase()}</b>${info.ourColors && info.theirColors && /bleu/i.test(info.ourColors) && /bleu/i.test(info.theirColors) ? html` <span class="warn">— couleurs proches, prévoir le second jeu</span>` : null}</dd></div>` : null}
+              ${info && (info.ourColors || info.theirColors) ? html`<div><dt>Maillots</dt><dd>${q.us()} <b>${(info.ourColors || "?").toLowerCase()}</b> · ${m.opponent} <b>${(info.theirColors || "?").toLowerCase()}</b>${info.ourColors && info.theirColors && /bleu/i.test(info.ourColors) && /bleu/i.test(info.theirColors) ? html` <span class="warn">— couleurs proches, prévoir le second jeu</span>` : null}</dd></div>` : null}
               ${info && info.code ? html`<div><dt>Championnat</dt><dd>${info.title} · match ${info.code}${info.round ? ", journée " + info.round : ""}</dd></div>` : null}
             </dl>
           </section>
@@ -310,8 +323,8 @@
             <button class="btn ghost sm" onClick=${() => openSheet({ type: "team", team: info.team })}>Fiche complète de ${m.opponent}</button>
           </section>` : null}
           <section class="card">
-            <div class="block-head"><h2 class="h-sec">Joueurs convoqués</h2><span class="muted">${plural(players.length, "joueur", "joueurs")}</span></div>
-            ${q.squadOf(m.id) ? null : html`<p class="muted small">Tout l’effectif, tant que le coach n’a pas fait sa sélection (« Date, lieu, joueurs »).</p>`}
+            <div class="block-head"><h2 class="h-sec">${C.g("Joueurs convoqués", "Joueuses convoquées")}</h2><span class="muted">${plural(players.length, C.g("joueur", "joueuse"), C.g("joueurs", "joueuses"))}</span></div>
+            ${q.squadOf(m.id) ? null : html`<p class="muted small">Tout l’effectif, tant que le coach n’a pas fait sa sélection (« Date, lieu, ${C.g("joueurs", "joueuses")} »).</p>`}
             <div class="up-squad">${groups.map((g) => html`<div key=${g.k} class=${"pos-" + (g.k || "none")}><span class="eyebrow"><span class="vb-dot"></span>${g.label}</span><ul>${g.players.map((p) => { const partner = partnerOf(m, p.id); return html`<li key=${p.id}>${p.name}${partner ? html`<small class="vb-pair"><${Icon} name="swap" size=${12} />${q.name(partner)}</small>` : null}</li>`; })}</ul></div>`)}</div>
           </section>
         </div>

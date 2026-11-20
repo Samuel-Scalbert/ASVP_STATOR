@@ -82,10 +82,10 @@
       </section>
 
       <section class="card">
-        <h2 class="h-sec">Joueurs sur la saison</h2>
+        <h2 class="h-sec">${C.g("Joueurs", "Joueuses")} sur la saison</h2>
         ${!rows.length ? html`<p class="muted">Les totaux apparaîtront après les premières saisies.</p>` : html`
         <div class="tbl-wrap"><table class="tbl rates">
-          <thead><tr><th scope="col" class="left">Joueur</th>${th("n", "Matchs")}${th("P", "Points")}${th("F", "Fautes")}${th("diff", "+/−")}
+          <thead><tr><th scope="col" class="left">${C.g("Joueur", "Joueuse")}</th>${th("n", "Matchs")}${th("P", "Points")}${th("F", "Fautes")}${th("diff", "+/−")}
             ${["service", "reception", "passe", "attaque"].map((k) => th(k, C.SKILL[k].label))}</tr></thead>
           <tbody>${rows.map((r) => html`<tr key=${r.p.id} class=${who === r.p.id ? "hl" : ""}>
             <th scope="row" class="left"><button class="linkish" onClick=${() => setWho(r.p.id)}>${r.p.name}</button>${q.posteLabel(r.p.id) ? html`<small>${q.posteLabel(r.p.id)}</small>` : null}</th>
@@ -93,7 +93,7 @@
             ${["service", "reception", "passe", "attaque"].map((k) => html`<td key=${k}>${r.rates[k].total ? html`<${RateChip} r=${r.rates[k]} compact /><small>${r.rates[k].ok}/${r.rates[k].total}</small>` : html`<span class="muted">–</span>`}</td>`)}
           </tr>`)}</tbody>
         </table></div>
-        <p class="muted small">Taux pondérés par le nombre de gestes sur toute la saison. Touche un nom pour suivre un joueur.</p>`}
+        <p class="muted small">Taux pondérés par le nombre de gestes sur toute la saison. Touche un nom pour suivre ${C.g("un joueur", "une joueuse")}.</p>`}
       </section>
 
       ${who !== "team" && html`<section class="card">
@@ -119,7 +119,7 @@
       setState({ step: "reading", file: file.name });
       try {
         const res = await root.StatorIO.readWorkbookFile(file);
-        if (!res.players.length) { setState({ step: "pick", error: "Aucune feuille joueur reconnue. Le fichier doit suivre le modèle ASVP (« Services » en B3, « Attaques » en B24)." }); return; }
+        if (!res.players.length) { setState({ step: "pick", error: "Aucune feuille " + C.g("joueur", "joueuse") + " reconnue. Le fichier doit suivre le modèle " + q.us() + " (« Services » en B3, « Attaques » en B24)." }); return; }
         setOpp(res.opponent); setState({ step: "preview", file: file.name, res });
       } catch (err) {
         setState({ step: "pick", error: "Lecture impossible : vérifie qu’il s’agit d’un fichier .xlsx et que tu es connecté à Internet." });
@@ -137,7 +137,7 @@
         return id;
       };
       const ids = res.players.map((p) => idOf(p.name));
-      const cfg = Object.assign({ team: "ASVP" }, store.config || {}, { roster });
+      const cfg = Object.assign({ team: q.us() }, store.config || {}, { roster });
       if (!cfg.season && date) cfg.season = C.seasonOf(date);
       api.saveConfig(cfg);
       const a = parseInt(ra, 10), o = parseInt(ro, 10);
@@ -152,7 +152,7 @@
     };
     if (state.step !== "preview") {
       return html`<div class="import">
-        <p>Choisis un fichier Excel de match au format de l’équipe (une feuille par joueur). Les stats et les bilans sont repris, y compris ceux écrits directement dans la feuille BILAN.</p>
+        <p>Choisis un fichier Excel de match au format de l’équipe (une feuille par ${C.g("joueur", "joueuse")}). Les stats et les bilans sont repris, y compris ceux écrits directement dans la feuille BILAN.</p>
         <label class="file-drop" for="imp-file"><${Icon} name="up" /><span>${state.step === "reading" ? "Lecture de " + state.file + "…" : "Choisir un fichier .xlsx"}</span></label>
         <input id="imp-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange=${onFile} class="sr-only" />
         ${state.error && html`<p class="form-err" role="alert">${state.error}</p>`}
@@ -169,9 +169,9 @@
       <div class="field-row">
         <div class="field"><label for="imp-date"><b>Date du match</b><small>Absente du fichier</small></label><input id="imp-date" type="date" value=${date} onInput=${(e) => setDate(e.target.value)} /></div>
         <div class="field"><span class="lbl"><b>Résultat en sets</b><small>Facultatif</small></span>
-          <div class="res-inputs"><span>ASVP</span><input id="imp-ra" inputmode="numeric" aria-label="Sets gagnés par ASVP" value=${ra} onInput=${(e) => setRa(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>–</span><input id="imp-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /></div></div>
+          <div class="res-inputs"><span>${q.us()}</span><input id="imp-ra" inputmode="numeric" aria-label=${"Sets gagnés par " + q.us()} value=${ra} onInput=${(e) => setRa(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /><span>–</span><input id="imp-ro" inputmode="numeric" aria-label="Sets gagnés par l’adversaire" value=${ro} onInput=${(e) => setRo(e.target.value.replace(/[^0-3]/g, "").slice(0, 1))} /></div></div>
       </div>
-      <h3 class="h-sub">${plural(filled.length, "joueur avec des stats", "joueurs avec des stats")} sur ${res.players.length}</h3>
+      <h3 class="h-sub">${plural(filled.length, C.g("joueur", "joueuse") + " avec des stats", C.g("joueurs", "joueuses") + " avec des stats")} sur ${res.players.length}</h3>
       <ul class="imp-list">${filled.map((p) => html`<li key=${p.sheet}><b>${p.name}</b><span>${plural(p.actions, "action", "actions")}${C.hasBilan(p) ? " · bilan" : ""}</span></li>`)}</ul>
       ${fresh.length ? html`<p class="muted small">Ajoutés à l’effectif : ${fresh.map((p) => p.name).join(", ")}.</p>` : null}
       ${dup ? html`<p class="warn small">Un match contre ${dup.opponent} existe déjà (${fmtDate(dup.date)}). L’import en créera un second.</p>` : null}
@@ -182,7 +182,7 @@
   /* ---------- Équipe : effectif, postes, données ---------- */
   function Team({ go, openSheet, me }) {
     const [newName, setNewName] = useState("");
-    const cfg = store.config || { team: "ASVP", roster: [] };
+    const cfg = store.config || { team: q.us(), roster: [] };
     const roster = q.roster();
     const ro = store.readOnly;
     const save = (patch) => api.saveConfig(Object.assign({}, cfg, patch));
@@ -206,7 +206,7 @@
       <h1 class="h-page">Effectif et réglages</h1>
       <div class="team-grid">
       <section class="card">
-        <h2 class="h-sec">Effectif · ${plural(q.active().length, "joueur", "joueurs")}</h2>
+        <h2 class="h-sec">Effectif · ${plural(q.active().length, C.g("joueur", "joueuse"), C.g("joueurs", "joueuses"))}</h2>
         <ul class="roster">
           ${roster.map((p) => html`<li key=${p.id} class=${p.active === false ? "off" : ""}>
             <input id=${"r-" + p.id} aria-label=${"Nom de " + p.name} value=${p.name} disabled=${ro} onChange=${(e) => rename(p.id, e.target.value)} />
@@ -219,14 +219,14 @@
           </li>`)}
         </ul>
         ${!ro && html`<form class="add-row" onSubmit=${add}>
-          <input id="r-new" value=${newName} onInput=${(e) => setNewName(e.target.value)} placeholder="Nom du joueur" aria-label="Nom du nouveau joueur" />
+          <input id="r-new" value=${newName} onInput=${(e) => setNewName(e.target.value)} placeholder=${C.g("Nom du joueur", "Nom de la joueuse")} aria-label=${C.g("Nom du nouveau joueur", "Nom de la nouvelle joueuse")} />
           <button class="btn dark sm" type="submit"><${Icon} name="plus" size=${16} />Ajouter</button>
         </form>`}
-        <p class="muted small">Un joueur retiré garde ses stats passées ; il n’apparaît plus dans les nouveaux matchs.</p>
+        <p class="muted small">${C.g("Un joueur retiré garde ses stats passées ; il n’apparaît", "Une joueuse retirée garde ses stats passées ; elle n’apparaît")} plus dans les nouveaux matchs.</p>
       </section>
       <section class="card">
         <div class="block-head"><h2 class="h-sec">Compos types</h2>${!ro && html`<button class="btn dark sm" onClick=${() => openSheet({ type: "lineup", template: null })}><${Icon} name="plus" size=${16} />Nouvelle compo type</button>`}</div>
-        <p class="muted small">Six de départ, libéro, binômes et commentaire : le coach les réutilise d’un match à l’autre (« Partir d’une compo type » dans la compo d’un match).</p>
+        <p class="muted small">${C.TEAM.format === 4 ? "Quatre de départ" : "Six de départ, libéro"}, binômes et commentaire : le coach les réutilise d’un match à l’autre (« Partir d’une compo type » dans la compo d’un match).</p>
         ${templates.length ? html`<ul class="tpl-rows">${templates.map((t) => html`<li key=${t.id}>
           <div class="tpl-main"><b>${t.name}</b><small>${Object.keys(t.positions || {}).length} sur le terrain${t.libero ? " + libéro" : ""}${(t.pairs || []).length ? " · " + plural(t.pairs.length, "binôme", "binômes") : ""}</small></div>
           ${!ro && html`<div class="row-btns"><button class="btn ghost sm" onClick=${() => openSheet({ type: "lineup", template: t })}><${Icon} name="edit" size=${15} />Modifier</button>
@@ -235,6 +235,22 @@
       </section>
 
       <div class="col">
+      ${C.TEAM.key !== "asvp" && html`<section class="card">
+        <h2 class="h-sec">Nom de l’équipe</h2>
+        <div class="field"><label for="team-name"><b>Nom court</b><small>tableaux de score, « ${q.us()} – adversaire », fichiers Excel</small></label>
+          <input id="team-name" value=${q.us()} maxlength="20" disabled=${ro} onChange=${(e) => { const v = e.target.value.trim(); if (v) save({ team: v }); }} /></div>
+      </section>`}
+      ${store.mode === "api" && store.coach && html`<section class="card">
+        <h2 class="h-sec"><${Icon} name="lock" size=${20} />Profil coach</h2>
+        ${store.coach.coach
+          ? html`<p>Connecté : <b>${store.coach.coach.name}</b>. Le sélecteur d’équipe est dans le menu (en haut sur téléphone).</p>
+              <div class="row-btns">${store.coach.coach.teams.filter((t) => !t.current).map((t) => html`<a key=${t.key} class="btn ghost" href=${t.url}><${Icon} name="swap" size=${18} />Aller à ${t.name}</a>`)}
+              <button class="btn ghost" onClick=${() => api.coachLogout()}>Se déconnecter</button></div>`
+          : store.coach.available
+          ? html`<p class="muted small">Le coach se connecte avec son mot de passe pour passer d’une de ses équipes à l’autre.</p>
+              <div class="row-btns"><button class="btn ghost" onClick=${() => openSheet({ type: "coach-login" })}><${Icon} name="lock" size=${18} />Espace coach</button></div>`
+          : html`<p class="muted small">Pas encore de profil coach sur ce serveur. Pour le créer : <code>python -m stator.coach</code> (voir DEPLOIEMENT.md).</p>`}
+      </section>`}
       <section class=${cx("card", "mode-card", store.mode)}>
         <h2 class="h-sec">${store.mode === "local" ? "Mode hors ligne" : "Base de l’équipe"}</h2>
         <p>${store.mode === "local"
