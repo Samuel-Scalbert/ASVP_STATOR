@@ -241,14 +241,15 @@
   }
 
   /* Fond animé façon shader (WebGL) : un dégradé fluide qui ondule lentement, aux couleurs --today-1 à --today-4
-     de l'élément. Sans WebGL, le dégradé CSS du parent reste visible ; « animations réduites » : une image fixe. */
+     de l'élément (celles du site). Sans WebGL, le dégradé CSS animé du parent reste visible. Avec « animations
+     réduites » (réglage de l'appareil), le mouvement continue, deux fois plus lent. */
   const SHADER_VERT = "attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }";
   const SHADER_FRAG = [
     "precision mediump float;",
-    "uniform vec2 uR; uniform float uT; uniform vec3 c1; uniform vec3 c2; uniform vec3 c3; uniform vec3 c4;",
+    "uniform vec2 uR; uniform float uT; uniform float uS; uniform vec3 c1; uniform vec3 c2; uniform vec3 c3; uniform vec3 c4;",
     "void main() {",
     "  vec2 p = (gl_FragCoord.xy / uR - 0.5) * vec2(uR.x / uR.y, 1.0) * 2.2;",
-    "  float t = uT * 0.11;",
+    "  float t = uT * uS;",
     "  for (int i = 1; i < 5; i++) {",
     "    float fi = float(i);",
     "    p += vec2(0.6 / fi * sin(fi * p.y + t + 0.3 * fi), 0.5 / fi * cos(fi * p.x - t * 0.8 + 0.5 * fi));",
@@ -256,15 +257,19 @@
     "  float a = 0.5 + 0.5 * sin(p.x + t * 0.7);",
     "  float b = 0.5 + 0.5 * cos(p.y * 1.2 - t * 0.5);",
     "  vec3 col = mix(c1, c2, smoothstep(0.05, 0.95, a));",
-    "  col = mix(col, c3, smoothstep(0.25, 1.0, b) * 0.85);",
-    "  col = mix(col, c4, smoothstep(0.5, 1.0, (1.0 - a) * b) * 0.75);",
+    "  col = mix(col, c3, smoothstep(0.55, 1.0, b * a) * 0.9);",
+    "  col = mix(col, c4, smoothstep(0.4, 1.0, (1.0 - a) * b) * 0.7);",
     "  gl_FragColor = vec4(col, 1.0);",
     "}",
   ].join("\n");
-  function hexRgb(s) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(String(s || "").trim());
-    const n = m ? parseInt(m[1], 16) : 0;
-    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  /* Couleur CSS quelconque (#abc, #aabbcc, rgb(…)) -> [r, g, b] entre 0 et 1, via le canevas 2D qui la normalise. */
+  function cssRgb(s) {
+    let v = String(s || "").trim();
+    try { const c = document.createElement("canvas").getContext("2d"); c.fillStyle = "#000"; c.fillStyle = v; v = c.fillStyle; } catch (e) { /* tel quel */ }
+    const hex = /^#([0-9a-f]{6})$/i.exec(v);
+    if (hex) { const n = parseInt(hex[1], 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
+    const rgb = /rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(v);
+    return rgb ? [rgb[1] / 255, rgb[2] / 255, rgb[3] / 255] : [0, 0, 0];
   }
   function ShaderBg({ className }) {
     const ref = useRef(null);
@@ -286,9 +291,10 @@
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       const css = getComputedStyle(cv);
-      ["c1", "c2", "c3", "c4"].forEach((u, i) => gl.uniform3fv(gl.getUniformLocation(prog, u), hexRgb(css.getPropertyValue("--today-" + (i + 1)))));
+      ["c1", "c2", "c3", "c4"].forEach((u, i) => gl.uniform3fv(gl.getUniformLocation(prog, u), cssRgb(css.getPropertyValue("--today-" + (i + 1)))));
       const uR = gl.getUniformLocation(prog, "uR"), uT = gl.getUniformLocation(prog, "uT");
-      const still = root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const calm = root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      gl.uniform1f(gl.getUniformLocation(prog, "uS"), calm ? 0.16 : 0.32); // vitesse du mouvement
       const t0 = performance.now() - 40000; // démarre déjà « en mouvement »
       const draw = (now) => {
         const w = Math.max(1, Math.round(cv.clientWidth / 2)), h = Math.max(1, Math.round(cv.clientHeight / 2)); // demi-résolution : flou doux et économe
@@ -308,7 +314,7 @@
       if (io) io.observe(cv);
       const onResize = () => draw(performance.now());
       root.addEventListener("resize", onResize);
-      if (still) draw(performance.now()); else raf = requestAnimationFrame(loop);
+      raf = requestAnimationFrame(loop);
       return () => {
         cancelAnimationFrame(raf);
         if (io) io.disconnect();

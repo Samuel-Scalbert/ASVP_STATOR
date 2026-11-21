@@ -46,8 +46,8 @@
   --court: #0c2534; --court-line: #1d7aa3;
 }
 
-/* Match du jour : dégradé animé aux couleurs de l’équipe (bleu, cyan, jaune). */
-.today-hero { --today-1: #00aaff; --today-2: #00f7ff; --today-3: #ffd447; --today-4: #04324f; }
+/* Match du jour : dégradé animé aux couleurs du thème (bandeau, cyan, jaune) ; voile plus marqué sur le bleu vif. */
+.today-hero { --today-2: var(--accent-2); }
 .today-hero::after { background: linear-gradient(180deg, rgba(4, 30, 50, 0.25) 0%, rgba(4, 30, 50, 0.6) 100%); }
 
 /* Sur un bandeau, le jaune du thème ASVP devient la couleur « qui ressort » du bandeau. */
