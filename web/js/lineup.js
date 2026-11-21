@@ -222,8 +222,9 @@
     </li>`)}</ol>`;
   }
   /* Filtre des consignes : toutes, « pour moi » (le poste du joueur connecté), ou un poste. */
+  const meOnRoster = () => q.roster().find((p) => p.id === lsGet("asvp-stator-me", null)) || null;
   function ConsignesFilter({ items, role, setRole }) {
-    const me = q.roster().find((p) => p.id === lsGet("asvp-stator-me", null));
+    const me = meOnRoster();
     const used = C.ROLES.filter((r) => items.some((c) => rolesOf(c).indexOf(r.k) >= 0));
     if (!used.length) return null; // aucune consigne ciblée : pas de filtre
     const count = (k) => items.filter((c) => forRole(c, k)).length;
@@ -269,11 +270,29 @@
   function ConsignesCard({ m, openSheet, prominent }) {
     const items = m.consignes || [];
     const [role, setRole] = useState(null);
-    const edit = !store.readOnly && html`<button class="btn ghost sm" onClick=${() => openSheet({ type: "consignes", m })}><${Icon} name="edit" size=${16} />${items.length ? "Modifier" : "Écrire les consignes"}</button>`;
-    return html`<section class=${cx("card prep-card consignes-card", prominent && "prominent")}>
-      <div class="block-head"><h2 class="h-sec"><${Icon} name="flag" size=${20} />Consignes du coach</h2>${edit}</div>
-      ${items.length ? html`<${ConsignesFilter} items=${items} role=${role} setRole=${setRole} /><${ConsignesView} items=${items} role=${role} />` : html`<p class="muted">Pas encore de consignes. Le coach note ici le plan de jeu, par priorité : rouge, orange, vert.</p>`}
-    </section>`;
+    // preventDefault : le bouton est dans l’en-tête du bloc repliable, le toucher ne doit pas le déplier.
+    const edit = !store.readOnly && html`<button class="btn ghost sm" onClick=${(e) => { e.preventDefault(); openSheet({ type: "consignes", m }); }}><${Icon} name="edit" size=${16} />${items.length ? "Modifier" : "Écrire les consignes"}</button>`;
+    const title = html`<h2 class="h-sec"><${Icon} name="flag" size=${20} />Consignes du coach</h2>`;
+    if (!items.length) {
+      return html`<section class=${cx("card prep-card consignes-card", prominent && "prominent")}>
+        <div class="block-head">${title}${edit}</div>
+        <p class="muted">Pas encore de consignes. Le coach note ici le plan de jeu, par priorité (rouge, orange, vert) ou sans priorité.</p>
+      </section>`;
+    }
+    // Bloc repliable, fermé au départ : l’en-tête dit combien il y a de consignes, et combien concernent le joueur connecté.
+    const me = meOnRoster();
+    const mine = me && me.poste && items.some((c) => rolesOf(c).length) ? items.filter((c) => forRole(c, me.poste)).length : null;
+    return html`<details class=${cx("card prep-card consignes-card cs-fold", prominent && "prominent")}>
+      <summary class="block-head">
+        <span class="cs-fold-title"><span class="cs-chev" aria-hidden="true"><${Icon} name="next" size=${18} /></span>${title}
+          <span class="cs-count">${plural(items.length, "consigne", "consignes")}${mine != null ? " · " + mine + " pour toi" : ""}</span></span>
+        ${edit}
+      </summary>
+      <div class="cs-fold-body">
+        <${ConsignesFilter} items=${items} role=${role} setRole=${setRole} />
+        <${ConsignesView} items=${items} role=${role} />
+      </div>
+    </details>`;
   }
   function LineupCard({ m, openSheet, compact }) {
     const lineups = m.lineups || [];

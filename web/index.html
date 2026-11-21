@@ -429,6 +429,15 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .cs-roles .cs-chip { padding: 3px 9px; font-size: 12px; }
 .consignes-card.prominent { border-color: var(--line-2); box-shadow: var(--shadow); }
 .consignes-card.prominent .h-sec { font-size: 22px; }
+/* Consignes en bloc repliable : on touche l’en-tête pour dérouler. */
+.cs-fold > summary { list-style: none; cursor: pointer; user-select: none; }
+.cs-fold > summary::-webkit-details-marker { display: none; }
+.cs-fold-title { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.cs-chev { display: inline-flex; color: var(--muted); transition: transform 0.18s ease; }
+.cs-fold[open] .cs-chev { transform: rotate(90deg); }
+.cs-count { font-size: 13px; font-weight: 600; color: var(--muted); }
+.cs-fold-body { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.cs-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
 .h-sec .ico { vertical-align: -3px; margin-right: 6px; color: var(--cta); }
 .cs-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .cs-rows li { display: flex; align-items: flex-start; gap: 8px; }
@@ -1053,6 +1062,7 @@ a.coach-team:hover { background: var(--band-wash); border-color: var(--band-line
 @media (prefers-reduced-motion: reduce) {
   .today-hero { animation-duration: 28s; } /* le fond du match du jour bouge quand même, plus lentement */
   .today-badge::before { animation: none; }
+  .cs-chev { transition: none; }
   .tile.has .tile-n { animation: none; }
   .tile-hit, .switch span { transition: none; }
 }
