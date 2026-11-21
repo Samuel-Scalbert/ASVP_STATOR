@@ -328,9 +328,11 @@
         return kb.localeCompare(ka) || String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
     },
-    /* Match à venir : daté après aujourd’hui, sans score ni fiche. Il est dans le calendrier, pas encore dans la liste des matchs. */
+    /* Match à venir : la saisie des stats n’est pas encore ouverte (3 h après le début du match), et il n’a ni score
+       ni fiche. Il est dans le calendrier avec sa page de préparation, pas encore dans la liste des matchs. */
     isUpcoming(m) {
-      return !!m.date && m.date > C.todayIso() && !C.matchResult(m) && !m.noData && !q.statsOf(m.id).some((d) => C.isFilled(d));
+      const at = C.entryOpensAt(m);
+      return !!at && Date.now() < at.getTime() && !C.matchResult(m) && !m.noData && !q.statsOf(m.id).some((d) => C.isFilled(d));
     },
     played() { return q.matchList().filter((m) => !q.isUpcoming(m)); },
     upcoming() {

@@ -129,7 +129,8 @@
 
     const go = (r) => {
       if (r.view === "entry" && !me) { setSheet({ type: "who", then: r }); return; }
-      if (r.view === "match" && (!route.matchId || route.matchId !== r.matchId)) setSub("synthese");
+      if (r.view === "match" && r.sub) setSub(r.sub);
+      else if (r.view === "match" && (!route.matchId || route.matchId !== r.matchId)) setSub("synthese");
       setRoute(r);
       root.scrollTo(0, 0);
     };

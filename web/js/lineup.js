@@ -253,19 +253,12 @@
     </section>`;
   }
   const hasPrep = (m) => !!((m.lineups && m.lineups.length) || (m.consignes && m.consignes.length));
-  /* Consignes et compo sur la page d’un match joué (ou du jour) : en tête, sur tous les onglets, pour toujours.
-     Le jour du match, les consignes restent en grand comme sur la page de préparation. */
-  function PrepBlock({ m, openSheet }) {
-    const today = m.date === C.todayIso();
-    const has = hasPrep(m);
-    if (!has && store.readOnly) return null;
-    return html`<details class="card prep-wrap" open=${has || today}>
-      <summary>${today ? "Le plan du coach pour aujourd’hui" : "Préparation du match"}<small>${has ? "consignes et compo du coach" : "pas encore de consignes ni de compo"}</small></summary>
-      <div class="prep-inner two">
-        <${ConsignesCard} m=${m} openSheet=${openSheet} prominent=${today} />
-        <${LineupCard} m=${m} openSheet=${openSheet} compact />
-      </div>
-    </details>`;
+  /* Onglet « Avant-match » de la page d’un match joué : les consignes et la compo du coach, gardées pour toujours. */
+  function PrepTab({ m, openSheet }) {
+    return html`<div class="prep-tab">
+      <${ConsignesCard} m=${m} openSheet=${openSheet} prominent />
+      <${LineupCard} m=${m} openSheet=${openSheet} compact />
+    </div>`;
   }
   /* Binôme d’un joueur dans les compos d’un match (pour la liste des convoqués). */
   function partnerOf(m, id) {
@@ -287,12 +280,15 @@
     const groups = grouped(players);
     const gym = info && info.gym;
     const warm = warmup(m.time);
+    const start = C.matchStart(m), opens = C.entryOpensAt(m);
+    const started = !!start && Date.now() >= start.getTime();
+    const hhmm = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     return html`<div>
       <section class="match-band upcoming-band">
         <div class="match-band-in">
           <button class="icon-btn on-band" onClick=${() => go({ view: "home" })} aria-label="Retour aux matchs"><${Icon} name="back" /></button>
           <div class="mb-main">
-            <span class="eyebrow on-band">Match à venir · ${k === 0 ? "aujourd’hui" : k === 1 ? "demain" : "J-" + k}${m.competition ? " · " + m.competition : ""}</span>
+            <span class="eyebrow on-band">${started ? "Match en cours" : "Match à venir · " + (k === 0 ? "aujourd’hui" : k === 1 ? "demain" : "J-" + k)}${m.competition ? " · " + m.competition : ""}${k <= 0 && opens ? " · saisie des stats dès " + fmtTime(hhmm(opens)) : ""}</span>
             <div class="board sm"><span class="board-team"><${TeamLogo} us size=${36} />${q.us()}</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
             <div class="up-when">
               <span class="up-date"><${Icon} name="cal" size=${18} />${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long" })}${m.time ? html` · <b>${fmtTime(m.time)}</b>` : html` · <i>heure à préciser</i>`}</span>
@@ -347,5 +343,5 @@
     </div>`;
   }
 
-  root.StatorPrep = { Court, LineupView, LineupEditor, LineupCard, ConsignesCard, ConsignesEditor, ConsignesView, PrepBlock, Upcoming, hasPrep, warmup, roleLabel };
+  root.StatorPrep = { Court, LineupView, LineupEditor, LineupCard, ConsignesCard, ConsignesEditor, ConsignesView, PrepTab, Upcoming, hasPrep, warmup, roleLabel };
 })(window);

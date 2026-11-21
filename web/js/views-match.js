@@ -106,7 +106,7 @@
         <div class="hero-actions">
           ${!store.readOnly && !m.noData && !m.closed && !out && html`<button class=${cx("btn primary", !featured && "sm")} onClick=${() => go(entryRoute(m, me))}>${state === "à faire" || !state ? "Saisir mes stats" : "Reprendre ma fiche"}</button>`}
           <button class=${cx("btn on-band-ghost", !featured && "sm")} onClick=${() => go({ view: "match", matchId: m.id })}>Voir le match</button>
-          ${root.StatorPrep.hasPrep(m) ? html`<button class=${cx("btn on-band-ghost", !featured && "sm")} onClick=${() => go({ view: "match", matchId: m.id })}><${Icon} name="flag" size=${16} />Consignes et compo</button>` : null}
+          ${root.StatorPrep.hasPrep(m) ? html`<button class=${cx("btn on-band-ghost", !featured && "sm")} onClick=${() => go({ view: "match", matchId: m.id, sub: "avant" })}><${Icon} name="flag" size=${16} />Consignes et compo</button>` : null}
         </div>
       </div>
     </section>`;
@@ -128,8 +128,7 @@
     const byDay = {};
     q.matchList().forEach((m) => { if (m.date && !byDay[m.date]) byDay[m.date] = { m }; });
     fixtures.forEach((x) => { if (!byDay[x.f.date]) byDay[x.f.date] = { x }; });
-    const todays = q.played().filter((m) => m.date === today && !C.matchResult(m)); // match du jour : il reste dans « À venir »
-    const next = todays.concat(q.upcoming()).map((m) => ({ key: m.id, date: m.date, time: m.time || "", m }))
+    const next = q.upcoming().map((m) => ({ key: m.id, date: m.date, time: m.time || "", m }))
       .concat(fixtures.filter((x) => x.upcoming).map((x) => ({ key: x.f.code, date: x.f.date, time: x.f.time, x })))
       .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
     const lead = (new Date(cur.y, cur.mo, 1).getDay() + 6) % 7; // semaines du lundi au dimanche
@@ -327,7 +326,7 @@
         <div class="seg-ctl" role="group" aria-label="Lieu">
           ${[["dom", "Domicile"], ["ext", "Extérieur"]].map(([k, l]) => html`<button type="button" key=${k} class=${venue === k ? "on" : ""} aria-pressed=${venue === k} onClick=${() => setVenue(venue === k ? "" : k)}>${l}</button>`)}
         </div></div>
-      ${upcoming ? html`<p class="muted small">Le match apparaît dans le calendrier et a sa page : compo, consignes et infos pratiques. Le jour du match, il rejoint la liste des matchs pour la saisie.</p>${squadFields}` : html`
+      ${upcoming ? html`<p class="muted small">Le match apparaît dans le calendrier et a sa page : compo, consignes et infos pratiques. Il rejoint la liste des matchs, et la saisie des stats ouvre, 3 h après le début du match.</p>${squadFields}` : html`
       <label class=${cx("nodata-toggle", noData && "on")} for="f-nodata">
         <input id="f-nodata" type="checkbox" checked=${noData} onChange=${(e) => { setNoData(e.target.checked); setErr(""); }} />
         <span><b>Pas de vidéo : score seulement</b>
@@ -754,7 +753,8 @@
       } catch (e) { U.toast("Impossible de préparer l’Excel : vérifie ta connexion."); }
       setBusy(false);
     };
-    const tabs = [["synthese", "Synthèse"], ["joueurs", C.g("Joueurs", "Joueuses")], ["bilans", "Bilans"]];
+    const tabs = m.noData ? [["avant", "Avant-match"], ["synthese", "Score"]]
+      : [["avant", "Avant-match"], ["synthese", "Synthèse"], ["joueurs", C.g("Joueurs", "Joueuses")], ["bilans", "Bilans"]];
     const toggleClosed = () => {
       api.saveMatch(Object.assign({}, m, { closed: !m.closed, updatedAt: new Date().toISOString() }));
       U.toast(m.closed ? "Match rouvert : les " + C.g("joueurs", "joueuses") + " peuvent à nouveau remplir leur fiche." : "Match marqué terminé : les points non notés ne sont pas comptabilisés.");
@@ -782,13 +782,13 @@
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "match-form", m })}><${Icon} name="edit" size=${16} />Modifier</button>`}
           ${!store.readOnly && html`<button class="btn on-band-ghost sm" onClick=${() => openSheet({ type: "delete", m })} aria-label="Supprimer le match"><${Icon} name="trash" size=${16} /></button>`}
         </div>
-        ${!m.noData && html`<div class="subtabs" role="tablist">
+        ${html`<div class="subtabs" role="tablist">
           ${tabs.map(([k, l]) => html`<button key=${k} role="tab" aria-selected=${sub === k} class=${sub === k ? "on" : ""} onClick=${() => setSub(k)}>${l}</button>`)}
         </div>`}
       </section>
       <div class="page wide">
-        <${root.StatorPrep.PrepBlock} m=${m} openSheet=${openSheet} />
-        ${m.noData ? html`<${NoDataPanel} m=${m} openSheet=${openSheet} />`
+        ${sub === "avant" ? html`<${root.StatorPrep.PrepTab} m=${m} openSheet=${openSheet} />`
+          : m.noData ? html`<${NoDataPanel} m=${m} openSheet=${openSheet} />`
           : sub === "joueurs" ? html`<${Players} m=${m} openSheet=${openSheet} />` : sub === "bilans" ? html`<${Bilans} m=${m} />` : html`<${Summary} m=${m} me=${me} go=${go} openSheet=${openSheet} />`}
       </div>
     </div>`;

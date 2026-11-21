@@ -188,6 +188,19 @@
     const r = matchResult(m);
     return r ? r.a + r.o : 0;
   }
+  /* Début officiel du match, en heure locale (sans heure connue : 20:00, l’heure habituelle des matchs).
+     La saisie des stats n’ouvre que 3 h après : avant, la page du match est celle de la préparation. */
+  const ENTRY_DELAY_H = 3, DEFAULT_TIME = "20:00";
+  function matchStart(m) {
+    if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(m.date || "")) return null;
+    const [y, mo, d] = m.date.split("-").map(Number);
+    const t = /^(\d{2}):(\d{2})$/.exec(m.time || "") || /^(\d{2}):(\d{2})$/.exec(DEFAULT_TIME);
+    return new Date(y, mo - 1, d, Number(t[1]), Number(t[2]));
+  }
+  function entryOpensAt(m) {
+    const s = matchStart(m);
+    return s ? new Date(s.getTime() + ENTRY_DELAY_H * 3600e3) : null;
+  }
   function seasonOf(dateStr) {
     if (!dateStr) return null;
     const [y, mo] = dateStr.split("-").map(Number);
@@ -537,7 +550,7 @@
     MAX_SETS, SET_COLS, setReferential, TEAM, g,
     norm, slug, uid, todayIso, clone, statId, setVal, setsArray, sumSkill, scoreLine, countActions, hasBilan, isFilled,
     canonSets, sameSets, sameExcelSets, withAppOnly, diffSets,
-    opponentLine, matchSets, matchResult, matchSetCount, seasonOf,
+    opponentLine, matchSets, matchResult, matchSetCount, matchStart, entryOpensAt, ENTRY_DELAY_H, seasonOf,
     parseWorkbookData, playerSheetSpec, playerExportSpec, matchWorkbookSpec, seasonWorkbookSpec,
   };
   Object.defineProperties(api, {
