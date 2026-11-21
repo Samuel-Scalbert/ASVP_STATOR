@@ -185,6 +185,36 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hero-actions .btn { flex: 1 1 160px; }
 /* Accueil : le dernier match, le calendrier (à droite sur PC, juste après sur téléphone), puis les autres matchs empilés. */
+/* Match du jour : fond en dégradé animé (canvas WebGL, voir ShaderBg), voile sombre pour la lisibilité. */
+.today-hero { --today-1: #f39325; --today-2: #e0457b; --today-3: #2d8cff; --today-4: #0b1526;
+  position: relative; isolation: isolate; overflow: hidden; border-radius: var(--r); color: #fff; margin-bottom: 16px;
+  box-shadow: 0 16px 44px rgba(11, 21, 38, 0.32);
+  background: linear-gradient(120deg, var(--today-1), var(--today-2), var(--today-3), var(--today-4)); background-size: 300% 300%;
+  animation: today-pan 24s ease-in-out infinite alternate; }
+.today-hero .shader-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -2; display: block; }
+.today-hero .shader-bg.no-gl { display: none; }
+.today-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(6, 10, 22, 0.12) 0%, rgba(6, 10, 22, 0.5) 100%); }
+.today-in { padding: 24px 22px 22px; display: flex; flex-direction: column; gap: 16px; }
+.today-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.today-badge { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-display); font-weight: 800; font-size: 14px;
+  text-transform: uppercase; letter-spacing: 0.06em; background: #fff; color: #0b1526; border-radius: 999px; padding: 4px 13px; }
+.today-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #e5383b; animation: today-pulse 1.6s ease-in-out infinite; }
+.today-when { font-weight: 600; font-size: 14.5px; color: rgba(255, 255, 255, 0.92); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); }
+.today-board .board-team { font-size: 38px; color: #fff; display: flex; align-items: center; gap: 12px; text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35); }
+.today-board .board-team.opp { justify-content: flex-end; }
+.today-vs { font-family: var(--font-display); font-size: 46px; font-weight: 800; color: #fff; opacity: 0.85; }
+.today-state { margin: 0; text-align: center; font-size: 15.5px; font-weight: 600; color: rgba(255, 255, 255, 0.95); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3); }
+.today-hero .btn.primary { background: #fff; color: #0b1526; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18); }
+.today-hero .btn.on-band-ghost { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: rgba(255, 255, 255, 0.4); backdrop-filter: blur(6px); }
+@keyframes today-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@keyframes today-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@media (max-width: 600px) {
+  .today-in { padding: 18px 16px 16px; }
+  .today-board .board-team { font-size: 24px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .today-board .board-team.opp { align-items: flex-end; flex-direction: column-reverse; }
+  .today-vs { font-size: 28px; }
+}
 .home-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .hl-first, .hl-rest { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .home-layout .hero { border: 1px solid var(--band-line); }
@@ -1006,6 +1036,7 @@ a.coach-team:hover { background: var(--band-wash); border-color: var(--band-line
   .with-video .skills-grid { display: flex; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .today-hero, .today-badge::before { animation: none; }
   .tile.has .tile-n { animation: none; }
   .tile-hit, .switch span { transition: none; }
 }

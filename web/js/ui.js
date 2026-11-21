@@ -240,6 +240,86 @@
     </figure>`;
   }
 
+  /* Fond animé façon shader (WebGL) : un dégradé fluide qui ondule lentement, aux couleurs --today-1 à --today-4
+     de l'élément. Sans WebGL, le dégradé CSS du parent reste visible ; « animations réduites » : une image fixe. */
+  const SHADER_VERT = "attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }";
+  const SHADER_FRAG = [
+    "precision mediump float;",
+    "uniform vec2 uR; uniform float uT; uniform vec3 c1; uniform vec3 c2; uniform vec3 c3; uniform vec3 c4;",
+    "void main() {",
+    "  vec2 p = (gl_FragCoord.xy / uR - 0.5) * vec2(uR.x / uR.y, 1.0) * 2.2;",
+    "  float t = uT * 0.11;",
+    "  for (int i = 1; i < 5; i++) {",
+    "    float fi = float(i);",
+    "    p += vec2(0.6 / fi * sin(fi * p.y + t + 0.3 * fi), 0.5 / fi * cos(fi * p.x - t * 0.8 + 0.5 * fi));",
+    "  }",
+    "  float a = 0.5 + 0.5 * sin(p.x + t * 0.7);",
+    "  float b = 0.5 + 0.5 * cos(p.y * 1.2 - t * 0.5);",
+    "  vec3 col = mix(c1, c2, smoothstep(0.05, 0.95, a));",
+    "  col = mix(col, c3, smoothstep(0.25, 1.0, b) * 0.85);",
+    "  col = mix(col, c4, smoothstep(0.5, 1.0, (1.0 - a) * b) * 0.75);",
+    "  gl_FragColor = vec4(col, 1.0);",
+    "}",
+  ].join("\n");
+  function hexRgb(s) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(s || "").trim());
+    const n = m ? parseInt(m[1], 16) : 0;
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  }
+  function ShaderBg({ className }) {
+    const ref = useRef(null);
+    useEffect(() => {
+      const cv = ref.current;
+      let gl = null;
+      try { gl = cv && cv.getContext("webgl", { antialias: false, depth: false }); } catch (e) { gl = null; }
+      if (!gl) { if (cv) cv.classList.add("no-gl"); return undefined; }
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, sh(gl.VERTEX_SHADER, SHADER_VERT));
+      gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, SHADER_FRAG));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { cv.classList.add("no-gl"); return undefined; }
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "p");
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      const css = getComputedStyle(cv);
+      ["c1", "c2", "c3", "c4"].forEach((u, i) => gl.uniform3fv(gl.getUniformLocation(prog, u), hexRgb(css.getPropertyValue("--today-" + (i + 1)))));
+      const uR = gl.getUniformLocation(prog, "uR"), uT = gl.getUniformLocation(prog, "uT");
+      const still = root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const t0 = performance.now() - 40000; // démarre déjà « en mouvement »
+      const draw = (now) => {
+        const w = Math.max(1, Math.round(cv.clientWidth / 2)), h = Math.max(1, Math.round(cv.clientHeight / 2)); // demi-résolution : flou doux et économe
+        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; gl.viewport(0, 0, w, h); }
+        gl.uniform2f(uR, w, h);
+        gl.uniform1f(uT, (now - t0) / 1000);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      };
+      let raf = 0, last = 0, visible = true;
+      const loop = (now) => {
+        raf = requestAnimationFrame(loop);
+        if (!visible || document.hidden || now - last < 40) return; // ~25 images/s suffisent à ce rythme
+        last = now;
+        draw(now);
+      };
+      const io = "IntersectionObserver" in root ? new IntersectionObserver((es) => { visible = es[0].isIntersecting; }) : null;
+      if (io) io.observe(cv);
+      const onResize = () => draw(performance.now());
+      root.addEventListener("resize", onResize);
+      if (still) draw(performance.now()); else raf = requestAnimationFrame(loop);
+      return () => {
+        cancelAnimationFrame(raf);
+        if (io) io.disconnect();
+        root.removeEventListener("resize", onResize);
+        const lose = gl.getExtension("WEBGL_lose_context");
+        if (lose) lose.loseContext();
+      };
+    }, []);
+    return html`<canvas ref=${ref} class=${cx("shader-bg", className)} aria-hidden="true"></canvas>`;
+  }
+
   /* Schéma du terrain : numéros de postes (vue depuis l’arrière, filet en haut). */
   function Court() {
     const z = [[4, 0, 0], [3, 1, 0], [2, 2, 0], [5, 0, 1], [6, 1, 1], [1, 2, 1]];
@@ -321,5 +401,5 @@
     </span>`;
   }
 
-  root.StatorUI = { TeamLogo, ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, fmtTime, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
+  root.StatorUI = { ShaderBg, TeamLogo, ExcelConflict, resolveExcel, pct, signed, plural, agree, fmtDate, shortDate, fmtTime, youtubeEmbed, cx, Icon, Sheet, Toasts, toast, Tile, RateChip, DistBar, distText, LevelLegend, Meter, Recap, RateChart, Court, DiffBar };
 })(window);

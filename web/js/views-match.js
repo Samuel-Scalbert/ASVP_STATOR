@@ -183,6 +183,35 @@
     </section>`;
   }
 
+  /* ---------- Match du jour : en grand, au-dessus des matchs joués, sur un fond animé ---------- */
+  function TodayCard({ m, go }) {
+    const P = root.StatorPrep;
+    const start = C.matchStart(m), opens = C.entryOpensAt(m);
+    const mins = start ? Math.round((start.getTime() - Date.now()) / 60000) : null;
+    const hhmm = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+    const until = mins == null ? "" : mins <= 0 ? "Match en cours" : mins < 60 ? "Coup d’envoi dans " + mins + " min"
+      : "Coup d’envoi dans " + Math.floor(mins / 60) + " h" + (mins % 60 ? " " + String(mins % 60).padStart(2, "0") : "");
+    const warm = P.warmup(m.time);
+    const when = [m.time ? "Match à " + fmtTime(m.time) : "Heure à préciser", warm ? "échauffement " + fmtTime(warm) : "", venueLabel(m.venue), m.competition].filter(Boolean).join(" · ");
+    const open = () => go({ view: "match", matchId: m.id });
+    return html`<section class="today-hero" aria-label=${"Match du jour : " + q.us() + " contre " + m.opponent}>
+      <${U.ShaderBg} />
+      <div class="today-in">
+        <div class="today-top"><span class="today-badge">Match du jour</span><span class="today-when">${when}</span></div>
+        <div class="board today-board">
+          <span class="board-team"><${TeamLogo} us size=${48} />${q.us()}</span>
+          <span class="today-vs">VS</span>
+          <span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${48} /></span>
+        </div>
+        <p class="today-state">${until}${opens ? html`${until ? " · " : ""}saisie des stats dès <b>${fmtTime(hhmm(opens))}</b>` : null}</p>
+        <div class="hero-actions">
+          <button class="btn primary" onClick=${open}><${Icon} name="flag" size=${18} />${P.hasPrep(m) ? "Consignes et compo du coach" : "Voir le match"}</button>
+          <button class="btn on-band-ghost" onClick=${open}><${Icon} name="pin" size=${18} />Infos pratiques</button>
+        </div>
+      </div>
+    </section>`;
+  }
+
   function Home({ me, go, openSheet }) {
     const [stepsOff, setStepsOff] = useState(() => lsGet("asvp-stator-steps", false));
     const list = q.played();
@@ -213,6 +242,7 @@
         <${WhoGrid} me=${me} onPick=${(id) => openSheet({ type: "who-picked", id })} />
       </section>`}
       ${!stepsOff && html`<${Steps} onClose=${() => { setStepsOff(true); lsSet("asvp-stator-steps", true); }} />`}
+      ${q.upcoming().filter((m) => m.date === C.todayIso()).map((m) => html`<${TodayCard} key=${m.id} m=${m} go=${go} />`)}
       <div class="home-layout">
         <div class="hl-first">${first ? html`<${MatchCard} m=${first} me=${me} go=${go} featured />` : html`<section class="card empty-state">
           <h2 class="h-sec">Aucun match joué pour l’instant</h2>
