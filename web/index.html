@@ -412,13 +412,28 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .consignes li { display: flex; align-items: baseline; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line-2); border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 600; line-height: 1.35; }
 .cs-badge { flex: none; min-width: 104px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .cs-badge::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-.cs-text { min-width: 0; }
+.cs-text { min-width: 0; white-space: pre-line; overflow-wrap: anywhere; } /* garde les retours à la ligne du coach */
+.cs-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Postes visés par une consigne, et filtre par poste (couleurs des postes de la compo). */
+.cs-tags, .cs-roles, .cs-filter { display: flex; flex-wrap: wrap; gap: 5px; }
+.cs-filter { margin-bottom: 2px; }
+.cs-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; line-height: 1.5; padding: 0 8px 0 6px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--ink-2); }
+.cs-tag .cs-dot, .cs-chip .cs-dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.cs-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 700; }
+.cs-chip small { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.cs-chip.on { background: var(--ink); color: var(--surface); border-color: var(--ink); } /* sélection nette en clair comme en sombre */
+.cs-chip.on small { color: inherit; opacity: 0.7; }
+.cs-chip.me { border-style: dashed; }
+.cs-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.cs-body textarea { flex: none; width: 100%; }
+.cs-roles .cs-chip { padding: 3px 9px; font-size: 12px; }
 .consignes-card.prominent { border-color: var(--line-2); box-shadow: var(--shadow); }
 .consignes-card.prominent .h-sec { font-size: 22px; }
 .h-sec .ico { vertical-align: -3px; margin-right: 6px; color: var(--cta); }
 .cs-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.cs-rows li { display: flex; align-items: center; gap: 8px; }
-.cs-rows li input { flex: 1; min-width: 0; min-height: 42px; border: 1px solid var(--line-2); border-left-width: 4px; border-radius: 10px; padding: 0 12px; font-weight: 600; background: var(--surface); color: var(--ink); }
+.cs-rows li { display: flex; align-items: flex-start; gap: 8px; }
+.cs-rows li .cs-levels, .cs-rows li .icon-btn { margin-top: 6px; }
+.cs-rows li textarea { flex: 1; min-width: 0; min-height: 42px; field-sizing: content; max-height: 260px; resize: vertical; border: 1px solid var(--line-2); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; font: inherit; font-weight: 600; line-height: 1.35; background: var(--surface); color: var(--ink); }
 .cs-levels { display: flex; gap: 3px; flex: none; }
 .cs-lvl { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-2); background: transparent; font-weight: 800; font-size: 12px; color: var(--muted); padding: 0; }
 .cs-lvl.on { color: #fff; }
@@ -426,20 +441,21 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .consignes li.lvl-1 .cs-badge { color: var(--cs-1); }
 .consignes li.lvl-1 .cs-badge::before { background: var(--cs-1); }
 .cs-lvl.lvl-1.on { background: var(--cs-1); border-color: var(--cs-1); }
-.cs-rows li.lvl-1 input { border-left-color: var(--cs-1); }
+.cs-rows li.lvl-1 textarea { border-left-color: var(--cs-1); }
 .cs-ink-1 { color: var(--cs-1); }
 .consignes li.lvl-2 { border-left-color: var(--cs-2); }
 .consignes li.lvl-2 .cs-badge { color: var(--cs-2); }
 .consignes li.lvl-2 .cs-badge::before { background: var(--cs-2); }
 .cs-lvl.lvl-2.on { background: var(--cs-2); border-color: var(--cs-2); }
-.cs-rows li.lvl-2 input { border-left-color: var(--cs-2); }
+.cs-rows li.lvl-2 textarea { border-left-color: var(--cs-2); }
 .cs-ink-2 { color: var(--cs-2); }
 .consignes li.lvl-3 { border-left-color: var(--cs-3); }
 .consignes li.lvl-3 .cs-badge { color: var(--cs-3); }
 .consignes li.lvl-3 .cs-badge::before { background: var(--cs-3); }
 .cs-lvl.lvl-3.on { background: var(--cs-3); border-color: var(--cs-3); }
-.cs-rows li.lvl-3 input { border-left-color: var(--cs-3); }
+.cs-rows li.lvl-3 textarea { border-left-color: var(--cs-3); }
 .cs-ink-3 { color: var(--cs-3); }
+.cs-lvl.lvl-0.on { background: var(--muted); border-color: var(--muted); } /* sans priorité : bordure neutre, pas d’étiquette */
 .note-preview { border-left: 3px solid var(--cta); padding-left: 12px; display: flex; flex-direction: column; gap: 6px; }
 .prep-card { gap: 10px; }
 .prep-wrap { gap: 0; }

@@ -171,7 +171,8 @@ def test_coach_lineups_and_consignes(team):
     for lineup in bad:
         assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[lineup])).status_code == 400
     assert team.put("/api/matches/m-prepa", json=dict(match, lineups=[LINEUP] * 5)).status_code == 400
-    for consignes in ([{"text": "x", "level": 4}], [{"text": "x" * 301, "level": 1}], [{"text": "x"}]):
+    for consignes in ([{"text": "x", "level": 4}], [{"text": "x" * 1001, "level": 1}], [{"text": "x"}], [{"text": "x", "level": True}],
+                      [{"text": "x", "level": 1, "roles": ["gardien"]}], [{"text": "x", "level": 1, "roles": "passeur"}]):
         assert team.put("/api/matches/m-prepa", json=dict(match, consignes=consignes)).status_code == 400
 
 
@@ -217,3 +218,22 @@ def test_passes_to_back_row_positions(team):
     fiche = dict(FICHE, sets={"1": {"passe": {"reussie_p6": 2, "reussie_p1": 1, "moyenne_p1": 1, "reussie_p3": 4}}})
     assert team.put("/api/stats/m-exemple__joueur-a", json=fiche).status_code == 200
     assert team.get("/api/state").get_json()["stats"]["m-exemple__joueur-a"]["sets"] == fiche["sets"]
+
+
+def test_consignes_without_priority_and_long_text(team):
+    """Une consigne peut n'avoir aucune priorité (0) et tenir sur plusieurs lignes, jusqu'à 1000 caractères."""
+    long_rule = ("Tout joueur qui commet 3 fautes directes est remplacé. " * 8).strip() + "\nPour le reste, les schémas parlent d'eux-mêmes."
+    consignes = [{"text": long_rule, "level": 0}, {"text": "Servir long", "level": 1}]
+    assert len(long_rule) > 300
+    r = team.put("/api/matches/m-prepa", json={"opponent": "Club Exemple", "date": "2026-12-05", "consignes": consignes})
+    assert r.status_code == 200 and r.get_json()["consignes"] == consignes
+
+
+def test_consignes_for_some_roles(team):
+    """Une consigne peut viser des postes (pour le filtre « Pour moi ») ; sans poste, elle vaut pour tous."""
+    consignes = [{"text": "Bloc ligne sur leur 4", "level": 1, "roles": ["libero", "central"]}, {"text": "Enjoy", "level": 0, "roles": []}]
+    r = team.put("/api/matches/m-prepa", json={"opponent": "Club Exemple", "date": "2026-12-05", "consignes": consignes})
+    assert r.status_code == 200
+    # Rangés dans l'ordre du référentiel ; une liste vide n'est pas enregistrée.
+    assert r.get_json()["consignes"] == [{"text": "Bloc ligne sur leur 4", "level": 1, "roles": ["central", "libero"]},
+                                         {"text": "Enjoy", "level": 0}]

@@ -5,7 +5,7 @@
   "use strict";
   const { html, useState } = root.htmPreact;
   const C = root.StatorCore;
-  const { store, api, q } = root.StatorStore;
+  const { store, api, q, lsGet } = root.StatorStore;
   const U = root.StatorUI;
   const { Icon, cx, plural, fmtDate, fmtTime, TeamLogo } = U;
 
@@ -199,31 +199,68 @@
     </div>`;
   }
 
-  /* ---------- Consignes du coach : une liste à priorités, du rouge au vert ---------- */
-  const LEVELS = [{ k: 1, label: "Essentiel", short: "Rouge" }, { k: 2, label: "Important", short: "Orange" }, { k: 3, label: "Bon à savoir", short: "Vert" }];
-  const byLevel = (items) => items.slice().sort((a, b) => a.level - b.level);
-  function ConsignesView({ items }) {
-    return html`<ol class="consignes">${byLevel(items).map((c, i) => html`<li key=${i} class=${"lvl-" + c.level}><span class="cs-badge">${LEVELS[c.level - 1].label}</span><span class="cs-text">${c.text}</span></li>`)}</ol>`;
+  /* ---------- Consignes du coach : une liste à priorités, du rouge au vert, ou sans priorité ---------- */
+  const LEVELS = [{ k: 1, label: "Essentiel", short: "R", name: "Rouge" }, { k: 2, label: "Important", short: "O", name: "Orange" },
+    { k: 3, label: "Bon à savoir", short: "V", name: "Vert" }, { k: 0, label: "Sans priorité", short: "–", name: "Sans priorité" }];
+  const levelOf = (k) => LEVELS.find((l) => l.k === k) || LEVELS[3];
+  // Du rouge au vert, puis les consignes sans priorité ; à priorité égale, l’ordre du coach est gardé.
+  const byLevel = (items) => items.slice().sort((a, b) => (a.level || 4) - (b.level || 4));
+  const CONSIGNE_MAX = 1000;
+  /* Postes visés par une consigne : aucun = toute l’équipe. Filtrer sur un poste garde aussi les consignes pour tous. */
+  const rolesOf = (c) => (Array.isArray(c.roles) ? c.roles : []);
+  const forRole = (c, role) => !role || !rolesOf(c).length || rolesOf(c).indexOf(role) >= 0;
+  function RoleTag({ k }) {
+    return html`<span class=${"cs-tag pos-" + k}><span class=${"cs-dot pos-" + k}></span>${roleLabel(k)}</span>`;
+  }
+  function ConsignesView({ items, role }) {
+    const shown = byLevel(items).filter((c) => forRole(c, role));
+    if (!shown.length) return html`<p class="muted">Aucune consigne pour ce poste.</p>`;
+    return html`<ol class="consignes">${shown.map((c, i) => html`<li key=${i} class=${"lvl-" + (c.level || 0)}>
+      ${c.level ? html`<span class="cs-badge">${levelOf(c.level).label}</span>` : null}
+      <div class="cs-main"><span class="cs-text">${c.text}</span>
+        ${rolesOf(c).length ? html`<span class="cs-tags">${rolesOf(c).map((k) => html`<${RoleTag} key=${k} k=${k} />`)}</span>` : null}</div>
+    </li>`)}</ol>`;
+  }
+  /* Filtre des consignes : toutes, « pour moi » (le poste du joueur connecté), ou un poste. */
+  function ConsignesFilter({ items, role, setRole }) {
+    const me = q.roster().find((p) => p.id === lsGet("asvp-stator-me", null));
+    const used = C.ROLES.filter((r) => items.some((c) => rolesOf(c).indexOf(r.k) >= 0));
+    if (!used.length) return null; // aucune consigne ciblée : pas de filtre
+    const count = (k) => items.filter((c) => forRole(c, k)).length;
+    const chip = (k, label, extra) => html`<button type="button" key=${k || "all"} class=${cx("cs-chip", k && "pos-" + k, role === k && "on")} aria-pressed=${role === k} onClick=${() => setRole(k)}>
+      ${k ? html`<span class=${"cs-dot pos-" + k}></span>` : null}${label}<small>${count(k)}</small>${extra || null}</button>`;
+    return html`<div class="cs-filter" role="group" aria-label="Filtrer les consignes par poste">
+      ${chip(null, "Toutes")}
+      ${me && me.poste && roleLabel(me.poste) ? html`<button type="button" class=${cx("cs-chip me", role === me.poste && "on")} aria-pressed=${role === me.poste} onClick=${() => setRole(me.poste)}><${Icon} name="users" size=${14} />Pour moi · ${roleLabel(me.poste)}<small>${count(me.poste)}</small></button>` : null}
+      ${used.map((r) => chip(r.k, r.label))}
+    </div>`;
   }
   function ConsignesEditor({ m, onDone }) {
     const [items, setItems] = useState(() => (m.consignes && m.consignes.length ? m.consignes.map((c) => Object.assign({}, c)) : [{ text: "", level: 1 }]));
     const set = (i, patch) => setItems((prev) => prev.map((c, j) => (j === i ? Object.assign({}, c, patch) : c)));
+    const toggleRole = (i, k) => set(i, { roles: k ? (rolesOf(items[i]).indexOf(k) >= 0 ? rolesOf(items[i]).filter((x) => x !== k) : rolesOf(items[i]).concat([k])) : [] });
     const save = () => {
-      const list = items.map((c) => ({ text: (c.text || "").trim(), level: c.level })).filter((c) => c.text);
+      const list = items.map((c) => Object.assign({ text: (c.text || "").trim(), level: c.level }, rolesOf(c).length ? { roles: C.ROLES.map((r) => r.k).filter((k) => rolesOf(c).indexOf(k) >= 0) } : {})).filter((c) => c.text);
       api.saveMatch(Object.assign({}, store.matches[m.id] || m, { consignes: list, updatedAt: new Date().toISOString() }));
       onDone(list.length);
     };
     return html`<div class="note-editor">
-      <p class="muted small">Une consigne par ligne, avec sa priorité : <b class="cs-ink-1">rouge</b> pour l’essentiel, <b class="cs-ink-2">orange</b> pour l’important, <b class="cs-ink-3">vert</b> pour le bon à savoir. Elles s’affichent en tête de la fiche du match, pour toute l’équipe.</p>
+      <p class="muted small">Une consigne par case (elle peut tenir sur plusieurs lignes), avec sa priorité : <b class="cs-ink-1">rouge</b> pour l’essentiel, <b class="cs-ink-2">orange</b> pour l’important, <b class="cs-ink-3">vert</b> pour le bon à savoir, ou <b>–</b> sans priorité. Sous chaque consigne, les postes concernés (« Tous » par défaut) : ${C.g("chaque joueur", "chaque joueuse")} peut alors filtrer les consignes de son poste.</p>
       <ul class="cs-rows">${items.map((c, i) => html`<li key=${i} class=${"lvl-" + c.level}>
-        <div class="cs-levels" role="group" aria-label="Priorité">${LEVELS.map((l) => html`<button type="button" key=${l.k} class=${cx("cs-lvl", "lvl-" + l.k, c.level === l.k && "on")} aria-pressed=${c.level === l.k} title=${l.label} onClick=${() => set(i, { level: l.k })}>${l.short.charAt(0)}</button>`)}</div>
-        <input value=${c.text} maxlength="300" placeholder=${["Service long sur leur passeur", "Bloc fermé sur le pointu", "On parle en défense"][i % 3]} aria-label=${"Consigne " + (i + 1)} onInput=${(e) => set(i, { text: e.target.value })} />
+        <div class="cs-levels" role="group" aria-label="Priorité">${LEVELS.map((l) => html`<button type="button" key=${l.k} class=${cx("cs-lvl", "lvl-" + l.k, (c.level || 0) === l.k && "on")} aria-pressed=${(c.level || 0) === l.k} title=${l.label} onClick=${() => set(i, { level: l.k })}>${l.short}</button>`)}</div>
+        <div class="cs-body">
+          <textarea rows="1" value=${c.text} maxlength=${CONSIGNE_MAX} placeholder=${["Service long sur leur passeur", "Bloc fermé sur le pointu", "On parle en défense"][i % 3]} aria-label=${"Consigne " + (i + 1)} onInput=${(e) => set(i, { text: e.target.value })}></textarea>
+          <div class="cs-roles" role="group" aria-label=${"Postes concernés par la consigne " + (i + 1)}>
+            <button type="button" class=${cx("cs-chip", !rolesOf(c).length && "on")} aria-pressed=${!rolesOf(c).length} onClick=${() => toggleRole(i, null)}>Tous</button>
+            ${C.ROLES.map((r) => html`<button type="button" key=${r.k} class=${cx("cs-chip", "pos-" + r.k, rolesOf(c).indexOf(r.k) >= 0 && "on")} aria-pressed=${rolesOf(c).indexOf(r.k) >= 0} onClick=${() => toggleRole(i, r.k)}><span class=${"cs-dot pos-" + r.k}></span>${r.label}</button>`)}
+          </div>
+        </div>
         <button type="button" class="icon-btn" aria-label="Retirer cette consigne" onClick=${() => setItems((prev) => prev.filter((_, j) => j !== i))}><${Icon} name="x" size=${16} /></button>
       </li>`)}</ul>
       <div class="row-btns">
         ${items.length < 30 && html`<button type="button" class="btn ghost sm" onClick=${() => setItems((prev) => prev.concat([{ text: "", level: 2 }]))}><${Icon} name="plus" size=${16} />Ajouter une consigne</button>`}
       </div>
-      ${items.some((c) => c.text.trim()) ? html`<div class="note-preview"><span class="eyebrow">Aperçu, du rouge au vert</span><${ConsignesView} items=${items.filter((c) => c.text.trim())} /></div>` : null}
+      ${items.some((c) => c.text.trim()) ? html`<div class="note-preview"><span class="eyebrow">Aperçu, du rouge au vert puis sans priorité</span><${ConsignesView} items=${items.filter((c) => c.text.trim())} /></div>` : null}
       <div class="row-btns end"><button type="button" class="btn primary" onClick=${save}><${Icon} name="check" size=${18} />Enregistrer</button></div>
     </div>`;
   }
@@ -231,10 +268,11 @@
   /* ---------- Cartes « Préparation » (consignes + compo), sur la page d’un match ---------- */
   function ConsignesCard({ m, openSheet, prominent }) {
     const items = m.consignes || [];
+    const [role, setRole] = useState(null);
     const edit = !store.readOnly && html`<button class="btn ghost sm" onClick=${() => openSheet({ type: "consignes", m })}><${Icon} name="edit" size=${16} />${items.length ? "Modifier" : "Écrire les consignes"}</button>`;
     return html`<section class=${cx("card prep-card consignes-card", prominent && "prominent")}>
       <div class="block-head"><h2 class="h-sec"><${Icon} name="flag" size=${20} />Consignes du coach</h2>${edit}</div>
-      ${items.length ? html`<${ConsignesView} items=${items} />` : html`<p class="muted">Pas encore de consignes. Le coach note ici le plan de jeu, par priorité : rouge, orange, vert.</p>`}
+      ${items.length ? html`<${ConsignesFilter} items=${items} role=${role} setRole=${setRole} /><${ConsignesView} items=${items} role=${role} />` : html`<p class="muted">Pas encore de consignes. Le coach note ici le plan de jeu, par priorité : rouge, orange, vert.</p>`}
     </section>`;
   }
   function LineupCard({ m, openSheet, compact }) {

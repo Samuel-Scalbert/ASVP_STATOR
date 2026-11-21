@@ -10,6 +10,7 @@ from datetime import date, datetime
 from flask import current_app
 
 from .models import Match, Player, SetScore, Setting, StatCount, StatSheet, db, utcnow
+from . import referentiel
 from .referentiel import field_ids
 
 ID_RE = re.compile(r"^[A-Za-z0-9_\-.~:@+]{1,170}$")
@@ -220,20 +221,33 @@ def _lineups(items) -> list[dict]:
     return [_lineup(item) for item in items]
 
 
-LEVELS = {1, 2, 3}  # consignes : 1 essentiel (rouge), 2 important (orange), 3 bon à savoir (vert)
+LEVELS = {0, 1, 2, 3}  # consignes : 1 essentiel (rouge), 2 important (orange), 3 bon à savoir (vert), 0 sans priorité
+CONSIGNE_MAX = 1000  # une consigne peut tenir sur plusieurs lignes (règle des remplacements, etc.)
+
+
+def _consigne_roles(value, allowed: list[str]) -> list[str]:
+    """Postes visés par une consigne (clés du référentiel de l'équipe), dans l'ordre du référentiel ; aucun = pour tous."""
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(r, str) or r not in allowed for r in value):
+        raise InvalidData("Consigne : postes inconnus.")
+    return [r for r in allowed if r in value]
 
 
 def _consignes(items) -> list[dict]:
     if not isinstance(items, list) or len(items) > 30:
         raise InvalidData("Consignes : 30 au plus.")
+    allowed = [r["key"] for r in referentiel.load()["roles"]]
     out = []
     for item in items:
         text = item.get("text") if isinstance(item, dict) else None
         level = item.get("level") if isinstance(item, dict) else None
-        if not isinstance(text, str) or len(text) > 300 or level not in LEVELS:
-            raise InvalidData("Consigne : un texte de 300 caractères au plus et une priorité de 1 à 3.")
+        if not isinstance(text, str) or len(text) > CONSIGNE_MAX or isinstance(level, bool) or level not in LEVELS:
+            raise InvalidData(f"Consigne : un texte de {CONSIGNE_MAX} caractères au plus, et une priorité de 1 à 3 ou aucune (0).")
+        roles = _consigne_roles(item.get("roles"), allowed)
         if text.strip():
-            out.append({"text": text.strip(), "level": level})
+            # Les postes ne sont écrits que s'il y en a : une consigne sans poste vaut pour toute l'équipe.
+            out.append(dict({"text": text.strip(), "level": level}, **({"roles": roles} if roles else {})))
     return out
 
 
