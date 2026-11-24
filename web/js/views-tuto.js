@@ -148,7 +148,7 @@
               <li><b>${C.g("Le joueur", "La joueuse")}</b> se choisit en haut de l’écran. « ${C.g("Joueur suivant", "Joueuse suivante")} », à la fin du bilan, enchaîne les fiches : une seule personne peut saisir toute l’équipe.</li>
               <li><b>Les sets</b> sont des onglets. Un set sans aucune stat apparaît <span class="pill-demo">grisé</span> : ${C.g("le joueur n’était pas", "la joueuse n’était pas")} sur le terrain. Il reste cliquable en cas d’oubli.</li>
               <li><b>Toucher une case</b> ajoute 1. Le <b>−</b> dans son coin retire 1. « Annuler », en bas, efface la dernière touche.</li>
-              <li><b>La vidéo YouTube</b> du match, si son lien est renseigné, s’affiche à côté des cases sur PC et reste en place quand on change de set ou de ${J}.</li>
+              <li><b>La vidéo YouTube</b> du match, si son lien est renseigné, s’ouvre dans un nouvel onglet avec le bouton « Vidéo » en haut de la fiche.</li>
               <li><b>Tout s’enregistre seul</b>, à chaque touche. Il n’y a rien à envoyer.</li>
             </ul>
             <${TryPad} />
@@ -294,7 +294,7 @@
               <dt>Je n’ai pas joué ce match.</dt><dd>Sur la page du match, « Modifier », puis décoche ton nom dans « ${C.g("Joueurs du match", "Joueuses du match")} » : l’app ne te demande plus ta fiche. Si une fiche existait déjà à ton nom, elle est mise de côté et ne compte plus ; recoche ton nom pour la retrouver.</dd>
               <dt>${C.g("Un joueur", "Une joueuse")} n’a pas joué un set.</dt><dd>On laisse le set vide : il apparaît grisé, et seuls les gestes saisis comptent.</dd>
               <dt>J’ai touché la mauvaise case.</dt><dd>Le − dans le coin de la case retire 1 ; « Annuler » en bas efface la dernière touche.</dd>
-              <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : sur PC, la vidéo s’affiche à côté des cases. Avec « ${C.g("Joueur suivant", "Joueuse suivante")} », une seule personne saisit toute l’équipe en revoyant le match.</dd>
+              <dt>Comment aller plus vite ?</dt><dd>Renseigne le lien YouTube du match (bouton « Modifier » du match) : le bouton « Vidéo » de la fiche l’ouvre dans un nouvel onglet, à mettre à côté des cases. Avec « ${C.g("Joueur suivant", "Joueuse suivante")} », une seule personne saisit toute l’équipe en revoyant le match.</dd>
               <dt>${C.g("Un joueur ne sait pas s’il doit", "Une joueuse ne sait pas si elle doit")} compter une action.</dt><dd>« Comment compter », à côté de chaque geste, donne la définition de chaque résultat.</dd>
               <dt>Une compo type, c’est quoi ?</dt><dd>Une compo enregistrée une fois pour toutes dans l’onglet Équipe (${SIX ? "six de départ, libéro" : "quatre de départ"}, binômes, commentaire). Dans la compo d’un match, « Partir d’une compo type » la recopie ; « Garder cette compo comme compo type » fait l’inverse.</dd>
               <dt>C’est quoi les binômes ?</dt><dd>${C.g("Deux joueurs aux profils proches", "Deux joueuses aux profils proches")} : dans une compo (ou une compo type), le coach associe ${C.g("à un joueur du terrain son remplaçant naturel", "à une joueuse du terrain sa remplaçante naturelle")}, avec « + binôme » dans sa case. Le binôme s’affiche sur le terrain, ${C.g("chez les remplaçants", "chez les remplaçantes")} et dans la liste des convoqués.</dd>

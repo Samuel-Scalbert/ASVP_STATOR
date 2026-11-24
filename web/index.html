@@ -1039,26 +1039,10 @@ a.coach-team:hover { background: var(--band-wash); border-color: var(--band-line
 .player-pick select { max-width: 100%; min-height: 34px; margin-top: 2px; padding: 0 8px; border-radius: 9px; border: 1px solid var(--band-line); background: var(--band-wash); color: var(--band-ink); font-family: var(--font-display); font-size: 19px; font-weight: 700; text-transform: uppercase; }
 .player-pick option { background: var(--surface); color: var(--ink); font-family: var(--font-body); text-transform: none; }
 .video-btn { flex: none; }
-.video-btn.on { background: var(--band-ink); color: var(--band); }
 .entry { display: flex; flex-direction: column; }
 .entry-inner { display: contents; }
 .entry-band { order: 0; }
-.video-dock { order: 1; display: flex; flex-direction: column; gap: 6px; padding: 14px var(--gutter-r) 0 var(--gutter-l); }
 .entry-page { order: 2; }
-.video-frame { position: relative; width: 100%; max-width: 720px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000000; }
-.video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-tip { font-size: 12.5px; color: var(--muted); }
-@media (min-width: 1024px) {
-  .video-dock { padding: 22px 36px 0; }
-}
-@media (min-width: 1180px) {
-  .entry.with-video { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); grid-template-areas: "band band" "video main"; align-items: start; }
-  .with-video .entry-band { grid-area: band; }
-  .with-video .video-dock { grid-area: video; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 112px); padding: 24px 12px 24px 36px; }
-  .with-video .video-frame { max-width: none; }
-  .with-video .entry-page { grid-area: main; max-width: none; margin: 0; padding-left: 12px; }
-  .with-video .skills-grid { display: flex; }
-}
 @media (prefers-reduced-motion: reduce) {
   .today-hero { animation-duration: 28s; } /* le fond du match du jour bouge quand même, plus lentement */
   .today-badge::before { animation: none; }

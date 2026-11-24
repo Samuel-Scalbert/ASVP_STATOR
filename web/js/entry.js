@@ -278,10 +278,9 @@
     </div>`;
   }
 
-  /* Écran de saisie : choix du joueur et vidéo du match (gardée quand on change de joueur). */
+  /* Écran de saisie : choix du joueur et lien vers la vidéo du match (ouverte dans un nouvel onglet). */
   function Entry({ matchId, playerId, go, onHelp }) {
     const m = store.matches[matchId];
-    const [videoOn, setVideoOn] = useState(() => lsGet("asvp-stator-video", true));
     useEffect(() => { // écran allumé pendant le comptage
       let lock = null;
       try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then((l) => { lock = l; }).catch(() => {}); } catch (e) { /* refusé */ }
@@ -289,26 +288,14 @@
     }, []);
     if (!m) return html`<div class="page"><p class="empty-state">Ce match n’existe plus.</p></div>`;
 
-    // Le lecteur intégré ne fonctionne qu’avec le serveur de l’équipe ; ailleurs, la vidéo s’ouvre dans YouTube.
-    const embed = store.mode === "api" ? U.youtubeEmbed(m.video) : null;
-    const showVideo = !!embed && videoOn;
-    const toggle = (on) => { setVideoOn(on); lsSet("asvp-stator-video", on); };
     const videoCtl = m.video
-      ? embed
-        ? html`<button class=${cx("btn sm on-band-ghost video-btn", showVideo && "on")} aria-pressed=${showVideo} onClick=${() => toggle(!showVideo)}><${Icon} name="play" size=${16} /><span>${showVideo ? "Masquer la vidéo" : "Vidéo"}</span></button>`
-        : html`<a class="btn sm on-band-ghost video-btn" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} /><span>Vidéo</span></a>`
+      ? html`<a class="btn sm on-band-ghost video-btn" href=${m.video} target="_blank" rel="noopener noreferrer"><${Icon} name="play" size=${16} /><span>Vidéo</span></a>`
       : m.videoKind === "discord"
         ? html`<span class="video-chip video-btn" title=${m.videoNote || "Fichier vidéo enregistré sur Discord"}><${Icon} name="play" size=${15} /><span>Vidéo sur Discord</span></span>`
         : null;
     const onSwitch = (id) => go({ view: "entry", matchId, playerId: id });
 
-    return html`<div class=${cx("entry", showVideo && "with-video")}>
-      ${showVideo && html`<aside class="video-dock" aria-label="Vidéo du match">
-        <div class="video-frame"><iframe src=${embed} title=${"Vidéo du match " + q.us() + " – " + m.opponent}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
-        <p class="video-tip">Lance la vidéo et compte en direct : la vidéo reste là quand tu changes de set ou de ${C.g("joueur", "joueuse")}.</p>
-      </aside>`}
+    return html`<div class="entry">
       <${SheetEditor} key=${playerId} m=${m} playerId=${playerId} go=${go} onHelp=${onHelp} onSwitch=${onSwitch} videoCtl=${videoCtl} />
     </div>`;
   }

@@ -93,5 +93,4 @@ et la servir en HTTPS.
 ## Version de démonstration
 
 Le dossier `web/` est aussi publié tel quel comme lien de démonstration (artefact Claude). Dans ce
-cas les données sont stockées dans la base de l'artefact, séparée de celle du serveur Flask, et la
-vidéo YouTube s'ouvre dans un nouvel onglet au lieu de s'afficher à côté des cases.
+cas les données sont stockées dans la base de l'artefact, séparée de celle du serveur Flask.
