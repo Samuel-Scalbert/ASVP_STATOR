@@ -322,12 +322,13 @@
   const STAFF = { E: "Entraîneur", EA: "Entraîneur adjoint" };
   const realMin = (n) => n >= 8; // la feuille est souvent remplie après le match : horaires sans valeur
   const fmtMin = (n) => (n >= 60 ? Math.floor(n / 60) + " h " + String(n % 60).padStart(2, "0") : n + " min");
-  function Roster({ name, r }) {
+  function Roster({ name, r, unknown }) {
+    const off = new Set((unknown || []).map((u) => u.num));
     return html`<section class="fd-roster">
       <h3 class="h-sub"><${TeamLogo} name=${name} size=${22} />${name}<small>${plural(r.players.length, "joueur", "joueurs")}</small></h3>
       <table class="fd-table"><thead><tr><th scope="col">N°</th><th scope="col">Nom</th><th scope="col">Licence</th></tr></thead>
         <tbody>${r.players.map((p) => html`<tr key=${p.num + p.lic}><td class="fd-num">${p.num}</td>
-          <td>${nice(p.name)}${p.libero ? html` <span class="fd-lib" title="Libéro">Libéro</span>` : null}</td><td class="fd-lic">${p.lic}</td></tr>`)}</tbody></table>
+          <td>${nice(p.name)}${p.libero ? html` <span class="fd-lib" title="Libéro">Libéro</span>` : null}${off.has(p.num) ? html` <span class="fd-unk" title="Pas reconnu dans l’effectif de l’app">pas dans l’effectif</span>` : null}</td><td class="fd-lic">${p.lic}</td></tr>`)}</tbody></table>
       ${r.staff.length ? html`<p class="small fd-staff">${r.staff.map((x) => html`<span key=${x.role + x.lic}>${STAFF[x.role] || x.role} : <b>${nice(x.name)}</b>${x.lic ? html` <small>(licence ${x.lic})</small>` : null}</span>`)}</p>` : null}
     </section>`;
   }
@@ -335,6 +336,8 @@
     const L = store.league;
     const [d, setD] = useState(null);
     const [err, setErr] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [msg, setMsg] = useState("");
     useEffect(() => {
       let on = true;
       fetch("api/league/sheets/" + encodeURIComponent(code), { headers: { Accept: "application/json" } })
@@ -348,6 +351,16 @@
     const timed = d.sets.some((s) => realMin(s.min));
     const extra = d.sets.some((s) => s.a.to || s.b.to || s.a.subs || s.b.subs);
     const won = (t) => d.sets.filter((s) => s[t].pts > s[t === "a" ? "b" : "a"].pts).length;
+    const sq = d.squad, unknown = sq ? sq.unknown : [];
+    const app = sq && store.matches[sq.match];
+    const resync = async () => {
+      setBusy(true);
+      const r = await api.applySheetSquad(code);
+      setBusy(false);
+      if (r.error) { setMsg(r.error); return; }
+      setD(Object.assign({}, d, { squad: r.squad }));
+      setMsg(plural(r.squad.players, C.g("joueur repris", "joueuse reprise"), C.g("joueurs repris", "joueuses reprises")) + " dans le match.");
+    };
     return html`<div class="fd">
       <p class="fd-head"><b>${d[ours]} ${won(ours)}–${won(theirs)} ${d[theirs]}</b>
         <span class="muted">match ${code}${timed && d.start ? " · " + fmtTime(d.start) + " → " + fmtTime(d.end) + (d.min ? " · " + fmtMin(d.min) : "") : ""}</span></p>
@@ -364,7 +377,13 @@
         </tr>`)}</tbody></table></div>
       ${timed ? null : html`<p class="muted small">Pas d’horaires exploitables : la feuille a été remplie après le match.</p>`}
       ${extra ? null : html`<p class="muted small">Aucun temps mort ni remplacement noté sur la feuille.</p>`}
-      <div class="fd-rosters"><${Roster} name=${d[ours]} r=${d.rosters[ours]} /><${Roster} name=${d[theirs]} r=${d.rosters[theirs]} /></div>
+      <section class="fd-squad">
+        ${sq ? html`<p><b>${C.g("Joueurs du match", "Joueuses du match")} repris de la feuille</b>${app ? " (" + q.us() + " – " + app.opponent + ", " + fmtDate(app.date) + ")" : ""} : ${plural(sq.players, C.g("joueur", "joueuse"), C.g("joueurs", "joueuses"))}. Ce sont ${C.g("eux", "elles")} qui ont une fiche à remplir.</p>`
+          : html`<p>Les ${C.g("joueurs", "joueuses")} de la feuille deviennent ${C.g("les joueurs", "les joueuses")} du match dès que le match existe dans l’app.</p>`}
+        ${unknown.length ? html`<p class="warn small">Pas reconnus dans l’effectif : ${unknown.map((u) => "n°" + u.num + " " + nice(u.name)).join(", ")}. Ajoute-les dans l’onglet Équipe (prénom, puis l’initiale du nom si deux ont le même prénom), puis reprends la feuille.</p>` : null}
+        ${canFix() ? html`<div class="row-btns"><button class="btn ghost sm" disabled=${busy} onClick=${resync}><${Icon} name="users" size=${15} />${busy ? "Mise à jour…" : "Reprendre les joueurs de la feuille"}</button>${msg ? html`<span class="small">${msg}</span>` : null}</div>` : null}
+      </section>
+      <div class="fd-rosters"><${Roster} name=${d[ours]} r=${d.rosters[ours]} unknown=${unknown} /><${Roster} name=${d[theirs]} r=${d.rosters[theirs]} /></div>
       <p class="muted small">Les six de départ, les sanctions et le capitaine ne sont pas repris ici : ils ne sont pas remplis sur les feuilles de cette poule. Ils restent visibles sur la feuille officielle.</p>
       ${L ? html`<a class="btn ghost sm" href=${fdmeUrl(L.source, code)} target="_blank" rel="noopener noreferrer">Feuille officielle (PDF)<${Icon} name="next" size=${14} /></a>` : null}
     </div>`;

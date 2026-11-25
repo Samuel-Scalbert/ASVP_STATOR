@@ -209,3 +209,43 @@ def test_league_sheet_stored_and_served(team):
     doc["matches"][0]["code"] = "ARMA039"
     team.put("/api/league", json=doc)
     assert team.get("/api/league/sheets/ARMA038").status_code == 404
+
+
+def test_squad_from_sheet_names():
+    from stator.models import Player
+    from stator.services import squad_from_sheet
+    roster = [Player(id=i, name=n) for i, n in [("nico-n", "Nico N"), ("nico-g", "Nico G"), ("antoine", "Antoine"),
+                                                ("antoine-d", "Antoine D"), ("kevin", "Kévin"), ("lucas", "Lucas")]]
+    sheet = [{"num": "05", "name": "NYSSEN NICOLAS"}, {"num": "09", "name": "GRAVOULET NICOLAS"},
+             {"num": "08", "name": "DOBLER ANTOINE"}, {"num": "13", "name": "MARTIN ANTOINE"},
+             {"num": "01", "name": "BOURGEOIS KEVIN"}, {"num": "10", "name": "INCONNU PAUL"},
+             {"num": "19", "name": "ROLLY LUCAS"}, {"num": "20", "name": "DURAND LUCAS"}]
+    ids, unknown = squad_from_sheet(sheet, roster)
+    # « Antoine D » est le plus précis pour DOBLER ; MARTIN ANTOINE va à « Antoine ». Deux Lucas : aucun n'est choisi.
+    assert ids == ["nico-n", "nico-g", "antoine-d", "antoine", "kevin"]
+    assert [u["num"] for u in unknown] == ["10", "19", "20"]
+
+
+def test_sheet_fills_the_match_squad(team):
+    team.put("/api/config", json={"team": "ASVP", "roster": [
+        {"id": "un", "name": "Un", "active": True}, {"id": "cinq", "name": "Cinq", "active": True},
+        {"id": "deux", "name": "Deux", "active": True}, {"id": "trois", "name": "Trois", "active": True}]})
+    doc = _scuf_league()
+    doc["team"] = "NOUS"
+    doc["matches"][0].update(home="EUX", away="NOUS", sets=[[25, 20]])
+    team.put("/api/league", json=doc)
+    sheet = ffvb.parse_fdme(_fake_fdme())
+    sheet["a"], sheet["b"] = "NOUS", "EUX"
+    # « Trois » a déjà rempli une fiche pour ce match : il reste, même absent de la feuille.
+    team.put("/api/matches/m-arma038", json={"opponent": "EUX", "date": "2026-12-13", "squad": []})
+    team.put("/api/stats/m-arma038__trois", json={"matchId": "m-arma038", "playerId": "trois", "sets": {}})
+    assert team.put("/api/league/sheets/ARMA038", json=sheet).status_code == 200
+    assert team.get("/api/state").get_json()["matches"]["m-arma038"]["squad"] == ["un", "cinq", "trois"]
+    assert team.get("/api/league/sheets/ARMA038").get_json()["squad"]["unknown"] == []
+    # Un match créé après coup reprend aussi les joueurs de la feuille.
+    team.delete("/api/matches/m-arma038")
+    team.put("/api/matches/m-arma038", json={"opponent": "EUX", "date": "2026-12-13", "squad": []})
+    assert team.get("/api/state").get_json()["matches"]["m-arma038"]["squad"] == ["un", "cinq"]
+    # À la demande (après un ajout dans l'effectif).
+    r = team.post("/api/league/sheets/ARMA038/squad")
+    assert r.status_code == 200 and r.get_json()["match"]["squad"] == ["un", "cinq"]

@@ -7,7 +7,7 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 9;
+  const API_LEVEL = 10;
   const COLS = ["matches", "stats"];
 
   /* Les équipes partagent le même site, donc le même stockage du navigateur : chaque équipe autre que l’ASVP
@@ -301,6 +301,17 @@
         if (!res.ok) return body.error || "Le serveur a refusé la correction.";
         store.league = body; emit(); return "";
       } catch (e) { return "Serveur injoignable : vérifie la connexion."; }
+    },
+    /* Reprend dans le match de l’app les joueurs de la feuille de match (FFVolley). Renvoie { error } ou { squad }. */
+    async applySheetSquad(code) {
+      if (store.mode !== "api" || store.readOnly) return { error: "Impossible ici." };
+      try {
+        const res = await fetch("api/league/sheets/" + encodeURIComponent(code) + "/squad", { method: "POST", headers: { Accept: "application/json" } });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return { error: body.error || "Le serveur a refusé." };
+        store.matches = Object.assign({}, store.matches, { [body.match.id]: body.match }); emit();
+        return { squad: body.squad };
+      } catch (e) { return { error: "Serveur injoignable : vérifie la connexion." }; }
     },
     /* Profil coach : connexion (mot de passe) et déconnexion. Renvoie un message d’erreur, ou "" si c’est bon. */
     async coachLogin(password) {

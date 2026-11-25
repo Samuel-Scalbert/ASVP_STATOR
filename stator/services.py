@@ -309,7 +309,8 @@ def save_match(match_id: str, doc: dict) -> Match:
     if not isinstance(sets, list) or len(sets) > 5:
         raise InvalidData("Score des sets invalide.")
     result = doc.get("result")
-    m = db.session.get(Match, match_id) or Match(id=match_id, created_at=utcnow())
+    existing = db.session.get(Match, match_id)
+    m = existing or Match(id=match_id, created_at=utcnow())
     m.opponent = opponent[:120]
     m.match_date = _parse_date(doc.get("date"))
     if "time" in doc:  # une page d'avant l'heure n'envoie pas ce champ : on garde l'heure déjà enregistrée
@@ -355,6 +356,8 @@ def save_match(match_id: str, doc: dict) -> Match:
         m.set_scores.clear()
         db.session.flush()  # libère les clés (match, set) avant de réinsérer
     m.set_scores.extend(scores)
+    if existing is None:  # match tout juste créé : la feuille de match, si elle est déjà lue, donne ses joueurs
+        _auto_squad(m)
     db.session.commit()
     return m
 
@@ -691,11 +694,115 @@ def save_league_sheet(code: str, doc: dict) -> dict:
         clean["rosters"][t] = {"players": [_person(p, "joueur") for p in players],
                                "staff": [_person(p, "encadrement", role=True) for p in staff]}
     sheets = _league_sheets()
+    first = code not in sheets
     sheets[code] = dict(clean, readAt=utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
     _store_sheets(sheets)
+    if first:  # feuille toute neuve : les joueurs du match de l'app deviennent ceux de la feuille
+        m = match_for_code(code)
+        if m is not None:
+            apply_sheet_squad(code, m, commit=False)
     db.session.commit()
-    return sheets[code]
+    return _league_sheets()[code]
 
 
 def league_sheet(code: str) -> dict | None:
     return _league_sheets().get(code)
+
+
+# ---------------------------------------------------------------- joueurs du match d'après la feuille
+# La feuille donne « NYSSEN NICOLAS » ; l'effectif de l'app « Nico N ». Un nom de l'app correspond quand son
+# premier mot est un prénom de la feuille (ou son début : « Nico » pour « Nicolas ») et que ses autres mots
+# (initiale ou nom) se retrouvent dans les autres mots de la feuille. Un nom qui correspond à plusieurs
+# joueurs n'est pas choisi au hasard : il est signalé, comme un joueur absent de l'effectif.
+def _words(text: str) -> list[str]:
+    return [w for w in re.split(r"[^a-z]+", norm(text)) if w]
+
+
+def _fits(app_name: str, words: list[str]) -> bool:
+    toks = _words(app_name)
+    if not toks:
+        return False
+    first, rest = toks[0], toks[1:]
+    for i, w in enumerate(words):
+        if w == first or (len(first) >= 3 and w.startswith(first)):
+            others = words[:i] + words[i + 1:]
+            if all(any(o.startswith(r) for o in others) for r in rest):
+                return True
+    return False
+
+
+def squad_from_sheet(players: list[dict], roster: list[Player]) -> tuple[list[str], list[dict]]:
+    """Joueurs de la feuille -> (ids de l'effectif, joueurs de la feuille non reconnus)."""
+    picks: dict[int, list[Player]] = {}
+    for k, p in enumerate(players):
+        cands = [r for r in roster if _fits(r.name, _words(p["name"]))]
+        if len(cands) > 1:  # « Antoine » et « Antoine D » : le nom le plus précis l'emporte
+            best = max(len(_words(r.name)) for r in cands)
+            cands = [r for r in cands if len(_words(r.name)) == best]
+        picks[k] = cands
+    taken: dict[str, int] = {}
+    for k, cands in picks.items():
+        if len(cands) == 1:
+            taken[cands[0].id] = taken.get(cands[0].id, 0) + 1
+    ids, unknown = [], []
+    for k, p in enumerate(players):
+        cands = picks[k]
+        if len(cands) == 1 and taken[cands[0].id] == 1:
+            ids.append(cands[0].id)
+        else:
+            unknown.append({"num": p["num"], "name": p["name"]})
+    return ids, unknown
+
+
+def match_for_code(code: str) -> Match | None:
+    """Le match de l'app pour un match de la poule : créé depuis celui-ci, ou le seul du même jour."""
+    m = db.session.get(Match, "m-" + code.lower())
+    if m is not None:
+        return m
+    raw = get_setting("league")
+    f = next((x for x in json.loads(raw)["matches"] if x["code"] == code), None) if raw else None
+    if not f or not f.get("date"):
+        return None
+    same = db.session.scalars(db.select(Match).where(Match.match_date == date.fromisoformat(f["date"]))).all()
+    return same[0] if len(same) == 1 else None
+
+
+def apply_sheet_squad(code: str, m: Match, commit: bool = True) -> dict:
+    """Met dans le match les joueurs de notre équipe présents sur la feuille. Ceux qui ont déjà rempli
+    une fiche pour ce match restent, même s'ils n'y sont pas (rien de saisi ne disparaît)."""
+    sheets = _league_sheets()
+    sheet, league = sheets.get(code), league_doc() or {}
+    side = next((t for t in ("a", "b") if sheet and sheet[t] == league.get("team")), None)
+    if side is None:
+        raise InvalidData("Notre équipe n'est pas sur cette feuille de match.")
+    roster = db.session.scalars(db.select(Player).order_by(Player.sort_order, Player.name)).all()
+    ids, unknown = squad_from_sheet(sheet["rosters"][side]["players"], roster)
+    if not ids:
+        raise InvalidData("Aucun joueur de la feuille n'a été reconnu dans l'effectif.")
+    filled = set(db.session.scalars(db.select(StatSheet.player_id).where(StatSheet.match_id == m.id)).all())
+    keep = set(ids) | filled
+    m.squad = ",".join(r.id for r in roster if r.id in keep)
+    db.session.add(m)
+    sheet["squad"] = {"match": m.id, "players": len(ids), "unknown": unknown, "at": utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+    _store_sheets(sheets)
+    if commit:
+        db.session.commit()
+    return sheet["squad"]
+
+
+def _auto_squad(m: Match) -> None:
+    """Pour un match qu'on vient de créer : s'il correspond à un match de la poule dont la feuille est lue."""
+    sheets = _league_sheets()
+    if not sheets:
+        return
+    raw = get_setting("league")
+    league = json.loads(raw) if raw else {}
+    us = league.get("team")
+    for f in league.get("matches", []):
+        if f["code"] in sheets and us in (f["home"], f["away"]) and (
+                m.id == "m-" + f["code"].lower() or (m.match_date and f.get("date") == m.match_date.isoformat())):
+            try:
+                apply_sheet_squad(f["code"], m, commit=False)
+            except InvalidData:
+                pass  # personne de reconnu : le match garde tout l'effectif
+            return

@@ -110,3 +110,13 @@ def get_league_sheet(code: str):
     if sheet is None:
         return jsonify(error="Pas de feuille de match pour ce match."), 404
     return jsonify(sheet)
+
+
+@bp.post("/league/sheets/<code>/squad")
+def post_league_sheet_squad(code: str):
+    """Reprend les joueurs de la feuille de match dans le match de l'app (après un ajout dans l'effectif)."""
+    m = services.match_for_code(code) if current_app.config["STATOR_TEAM"]["league"] else None
+    if m is None or services.league_sheet(code) is None:
+        return jsonify(error="Pas de match de l'app ou pas de feuille pour ce match."), 404
+    squad = services.apply_sheet_squad(code, m)
+    return jsonify(squad=squad, match=services.match_doc(m))
