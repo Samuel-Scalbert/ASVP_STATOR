@@ -39,6 +39,7 @@
   --good: #0ca30c; --good-ink: #006300; --good-bg: #e6f4e6;
   --bad: #d03b3b; --bad-ink: #b02626; --bad-bg: #fbe8e8;
   --warn-ink: #8a5300;
+  --se: #00786c; --se-bg: #e3f4f1; --se-line: #7cc8bd; /* SportEasy : membres reliés aux joueurs de l’effectif */
   --series: #2a78d6; --grid: #e3e7ee; --axis: #c3ccd9;
   --shadow: 0 1px 2px rgba(14, 26, 47, 0.06), 0 6px 18px rgba(14, 26, 47, 0.07);
   --scrim: rgba(8, 14, 26, 0.45);
@@ -55,7 +56,7 @@
     --o1: #86b6ef; --o2: #256abf; --o3: #a8443c; --o4: #f08a80;
     --o1-bg: #182b47; --o2-bg: #152238; --o3-bg: #2b1a1d; --o4-bg: #361c1e;
     --good: #2fbf3b; --good-ink: #6bd874; --good-bg: #13301b; --bad: #e66767; --bad-ink: #f29a94; --bad-bg: #3a1c1f;
-    --warn-ink: #f2b75e; --series: #3987e5; --grid: #222e45; --axis: #33415c; --court: #30241a; --court-line: #8a5a2b; --p-passeur: #7fb3f5; --p-passeur-bg: #182b47; --p-pointu: #f4a24a; --p-pointu-bg: #3a2712; --p-r4: #5fd38f; --p-r4-bg: #10301f; --p-central: #b596ee; --p-central-bg: #2a1f45; --p-libero: #f2d35b; --p-libero-bg: #3a2f0c; --p-none: #8592a8; --p-none-bg: #172234; --cs-1: #e66767; --cs-1-bg: #3a1c1f; --cs-2: #f4a24a; --cs-2-bg: #3a2712; --cs-3: #5fd38f; --cs-3-bg: #10301f;
+    --warn-ink: #f2b75e; --series: #3987e5; --grid: #222e45; --axis: #33415c; --court: #30241a; --court-line: #8a5a2b; --p-passeur: #7fb3f5; --p-passeur-bg: #182b47; --p-pointu: #f4a24a; --p-pointu-bg: #3a2712; --p-r4: #5fd38f; --p-r4-bg: #10301f; --p-central: #b596ee; --p-central-bg: #2a1f45; --p-libero: #f2d35b; --p-libero-bg: #3a2f0c; --p-none: #8592a8; --p-none-bg: #172234; --cs-1: #e66767; --cs-1-bg: #3a1c1f; --cs-2: #f4a24a; --cs-2-bg: #3a2712; --cs-3: #5fd38f; --cs-3-bg: #10301f; --se: #5fd6c6; --se-bg: #0f2c29; --se-line: #22675e;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25); --scrim: rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
@@ -66,7 +67,7 @@
   --o1: #86b6ef; --o2: #256abf; --o3: #a8443c; --o4: #f08a80;
   --o1-bg: #182b47; --o2-bg: #152238; --o3-bg: #2b1a1d; --o4-bg: #361c1e;
   --good: #2fbf3b; --good-ink: #6bd874; --good-bg: #13301b; --bad: #e66767; --bad-ink: #f29a94; --bad-bg: #3a1c1f;
-  --warn-ink: #f2b75e; --series: #3987e5; --grid: #222e45; --axis: #33415c; --court: #30241a; --court-line: #8a5a2b; --p-passeur: #7fb3f5; --p-passeur-bg: #182b47; --p-pointu: #f4a24a; --p-pointu-bg: #3a2712; --p-r4: #5fd38f; --p-r4-bg: #10301f; --p-central: #b596ee; --p-central-bg: #2a1f45; --p-libero: #f2d35b; --p-libero-bg: #3a2f0c; --p-none: #8592a8; --p-none-bg: #172234; --cs-1: #e66767; --cs-1-bg: #3a1c1f; --cs-2: #f4a24a; --cs-2-bg: #3a2712; --cs-3: #5fd38f; --cs-3-bg: #10301f;
+  --warn-ink: #f2b75e; --series: #3987e5; --grid: #222e45; --axis: #33415c; --court: #30241a; --court-line: #8a5a2b; --p-passeur: #7fb3f5; --p-passeur-bg: #182b47; --p-pointu: #f4a24a; --p-pointu-bg: #3a2712; --p-r4: #5fd38f; --p-r4-bg: #10301f; --p-central: #b596ee; --p-central-bg: #2a1f45; --p-libero: #f2d35b; --p-libero-bg: #3a2f0c; --p-none: #8592a8; --p-none-bg: #172234; --cs-1: #e66767; --cs-1-bg: #3a1c1f; --cs-2: #f4a24a; --cs-2-bg: #3a2712; --cs-3: #5fd38f; --cs-3-bg: #10301f; --se: #5fd6c6; --se-bg: #0f2c29; --se-line: #22675e;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.25); --scrim: rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
@@ -541,8 +542,13 @@ select { min-height: 40px; border-radius: 10px; border: 1px solid var(--line-2);
 .se-group.se-available li { background: var(--good-bg); color: var(--good-ink); }
 .se-group.se-unavailable li { background: var(--bad-bg); color: var(--bad-ink); }
 .se-group li.se-out { font-style: italic; opacity: 0.8; }
-.se-sel { flex: 1 1 150px; min-width: 0; max-width: 100%; }
-.se-sel.none { color: var(--muted); }
+.r-pair { display: flex; gap: 8px; flex: 1 1 300px; min-width: 0; }
+.roster li .r-pair input { flex: 1 1 0; min-width: 0; }
+.se-sel { flex: 1 1 0; min-width: 0; font-weight: 600; color: var(--se); background: var(--se-bg); border-color: var(--se-line); }
+.se-sel.none { color: var(--muted); background: var(--surface); border-color: var(--line-2); border-style: dashed; font-weight: 500; }
+.se-sel option { color: var(--ink); background: var(--surface); }
+.se-ink { color: var(--se); }
+.team-grid > .roster-wide { grid-column: 1 / -1; } /* place pour le nom et le membre SportEasy sur la même ligne */
 .se-links { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 .se-links p { margin: 0 0 6px; }
 .up-facts { margin: 0; display: flex; flex-direction: column; gap: 12px; }

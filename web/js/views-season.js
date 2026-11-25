@@ -211,19 +211,22 @@
       <span class="eyebrow">Équipe</span>
       <h1 class="h-page">Effectif et réglages</h1>
       <div class="team-grid">
-      <section class="card">
+      <section class=${cx("card", se && "roster-wide")}>
         <h2 class="h-sec">Effectif · ${plural(q.active().length, C.g("joueur", "joueuse"), C.g("joueurs", "joueuses"))}</h2>
         <ul class="roster">
           ${roster.map((p) => html`<li key=${p.id} class=${p.active === false ? "off" : ""}>
-            <input id=${"r-" + p.id} aria-label=${"Nom de " + p.name} value=${p.name} disabled=${ro} onChange=${(e) => rename(p.id, e.target.value)} />
+            <div class="r-pair">
+              <input id=${"r-" + p.id} aria-label=${"Nom de " + p.name} value=${p.name} disabled=${ro} onChange=${(e) => rename(p.id, e.target.value)} />
+              ${se ? html`<select id=${"rs-" + p.id} class=${cx("se-sel", !p.sporteasy && "none")} aria-label=${"Membre SportEasy de " + p.name} title="Membre SportEasy" value=${p.sporteasy || ""} disabled=${ro} onChange=${(e) => setSe(p.id, e.target.value)}>
+                <option value="">SportEasy…</option>
+                ${p.sporteasy && !seMembers.some((x) => x.id === p.sporteasy) ? html`<option value=${p.sporteasy}>Membre n° ${p.sporteasy} (pas dans la dernière lecture)</option>` : null}
+                ${seMembers.map((x) => html`<option key=${x.id} value=${x.id} disabled=${seTaken.has(x.id) && x.id !== p.sporteasy}>${x.name}</option>`)}
+              </select>` : null}
+            </div>
             <select id=${"rp-" + p.id} class="poste-sel" aria-label=${"Poste de " + p.name} value=${p.poste || ""} disabled=${ro} onChange=${(e) => setPoste(p.id, e.target.value)}>
               <option value="">Poste…</option>
               ${C.ROLES.map((r) => html`<option key=${r.k} value=${r.k}>${r.label}</option>`)}
             </select>
-            ${se ? html`<select id=${"rs-" + p.id} class=${cx("se-sel", !p.sporteasy && "none")} aria-label=${"Membre SportEasy de " + p.name} title="Membre SportEasy" value=${p.sporteasy || ""} disabled=${ro} onChange=${(e) => setSe(p.id, e.target.value)}>
-              <option value="">SportEasy…</option>
-              ${seMembers.map((x) => html`<option key=${x.id} value=${x.id} disabled=${seTaken.has(x.id) && x.id !== p.sporteasy}>${x.name}</option>`)}
-            </select>` : null}
             ${p.id === me && html`<span class="chip done">toi</span>`}
             <button class="btn ghost sm" disabled=${ro} onClick=${() => toggle(p.id)}>${p.active === false ? "Réintégrer" : "Retirer"}</button>
           </li>`)}
@@ -234,7 +237,7 @@
         </form>`}
         <p class="muted small">${C.g("Un joueur retiré garde ses stats passées ; il n’apparaît", "Une joueuse retirée garde ses stats passées ; elle n’apparaît")} plus dans les nouveaux matchs.</p>
         ${se ? html`<div class="se-links">
-          <p class="small"><b>SportEasy</b> : la liste à droite de chaque nom relie ${C.g("le joueur", "la joueuse")} à son compte SportEasy. Ses réponses aux convocations (dispo, absent…) remplissent alors ${C.g("les joueurs", "les joueuses")} du match avant le match. À régler une fois pour la saison.</p>
+          <p class="small"><b class="se-ink">SportEasy</b> : la liste à droite de chaque nom, en vert, relie ${C.g("le joueur", "la joueuse")} à son compte SportEasy. Ses réponses aux convocations (dispo, absent…) remplissent alors ${C.g("les joueurs", "les joueuses")} du match avant le match. À régler une fois pour la saison.</p>
           ${seFree.length ? html`<p class="muted small">Sur SportEasy sans ${C.g("joueur", "joueuse")} dans l’effectif : ${seFree.map((x) => x.name).join(", ")}.</p>` : null}
         </div>` : null}
       </section>
