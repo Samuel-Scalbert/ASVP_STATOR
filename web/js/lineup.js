@@ -337,6 +337,7 @@
     const groups = grouped(players);
     const gym = info && info.gym;
     const warm = warmup(m.time);
+    const meet = info ? info.meet : ""; // rendez-vous donné par le coach (correction du match)
     const start = C.matchStart(m), opens = C.entryOpensAt(m);
     const started = !!start && Date.now() >= start.getTime();
     const hhmm = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
@@ -349,7 +350,7 @@
             <div class="board sm"><span class="board-team"><${TeamLogo} us size=${36} />${q.us()}</span><span class="board-vs">vs</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
             <div class="up-when">
               <span class="up-date"><${Icon} name="cal" size=${18} />${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long" })}${m.time ? html` · <b>${fmtTime(m.time)}</b>` : html` · <i>heure à préciser</i>`}</span>
-              <span class="up-warm"><${Icon} name="ball" size=${18} />Échauffement ${warm ? html`à <b>${fmtTime(warm)}</b>` : html`<b>1 h avant</b>`}</span>
+              <span class="up-warm"><${Icon} name="ball" size=${18} />${meet ? html`Rendez-vous à <b>${fmtTime(meet)}</b>` : html`Échauffement ${warm ? html`à <b>${fmtTime(warm)}</b>` : html`<b>1 h avant</b>`}`}</span>
               <span class="up-place"><${Icon} name="pin" size=${18} />${venueLabel(m.venue) || "Lieu à préciser"}${gym ? html` · <b>${gym.name}</b>` : null}</span>
             </div>
           </div>
@@ -370,13 +371,16 @@
         <div class="col">
           <section class="card up-info">
             <h2 class="h-sec">Infos pratiques</h2>
+            ${info && info.fixture.fix ? html`<${LG.FixNote} f=${info.fixture} />` : null}
             <dl class="up-facts">
               <div><dt>Quand</dt><dd><b>${fmtDate(m.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</b>${m.time ? html`, match à ${fmtTime(m.time)}` : html`, <span class="warn">heure à préciser</span>`}</dd></div>
-              <div><dt>Chauffe</dt><dd>${warm ? html`<b>${fmtTime(warm)}</b>, ` : ""}une heure avant le match : on arrive en tenue.</dd></div>
+              ${meet ? html`<div><dt>Rendez-vous</dt><dd><b>${fmtTime(meet)}</b> à la salle.</dd></div>`
+                : html`<div><dt>Chauffe</dt><dd>${warm ? html`<b>${fmtTime(warm)}</b>, ` : ""}une heure avant le match : on arrive en tenue.</dd></div>`}
               <div><dt>Où</dt><dd>${gym ? html`<b>${gym.name}</b>${gym.address ? html`<br />${gym.address}` : null}<br /><a class="btn ghost sm up-maps" href=${gym.maps} target="_blank" rel="noopener noreferrer"><${Icon} name="pin" size=${15} />Itinéraire</a>` : html`${venueLabel(m.venue) || html`<span class="warn">Lieu à préciser</span>`}${m.venue === "ext" ? html` <span class="muted">· salle à confirmer</span>` : null}`}</dd></div>
               ${info && (info.ourColors || info.theirColors) ? html`<div><dt>Maillots</dt><dd>${q.us()} <b>${(info.ourColors || "?").toLowerCase()}</b> · ${m.opponent} <b>${(info.theirColors || "?").toLowerCase()}</b>${info.ourColors && info.theirColors && /bleu/i.test(info.ourColors) && /bleu/i.test(info.theirColors) ? html` <span class="warn">— couleurs proches, prévoir le second jeu</span>` : null}</dd></div>` : null}
               ${info && info.code ? html`<div><dt>Championnat</dt><dd>${info.title} · match ${info.code}${info.round ? ", journée " + info.round : ""}</dd></div>` : null}
             </dl>
+            ${info && LG.canFix() ? html`<div class="row-btns"><button class="btn ghost sm" onClick=${() => openSheet({ type: "fixture-fix", code: info.code })}><${Icon} name="edit" size=${15} />Horaire ou salle changés ? Corriger</button></div>` : null}
           </section>
           ${info && info.rank ? html`<section class="card up-opp">
             <div class="block-head"><h2 class="h-sec"><${TeamLogo} name=${m.opponent} size=${30} />L’adversaire</h2><span class="rank-chip">${LG.ordinal(info.rank)} sur ${info.teams}</span></div>

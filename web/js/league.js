@@ -4,7 +4,7 @@
    recalculés ici à chaque affichage. */
 (function (root) {
   "use strict";
-  const { html, useState } = root.htmPreact;
+  const { html, useState, useEffect } = root.htmPreact;
   const C = root.StatorCore;
   const { store, api, q } = root.StatorStore;
   const U = root.StatorUI;
@@ -80,7 +80,9 @@
     const vs = (ms) => ms.filter((x) => isPlayed(x) && [x.home, x.away].includes(s.opp) && [x.home, x.away].includes(L.team)).sort(byDate).map((x) => side(x, L.team));
     const h2hText = (list) => list.map((x) => `${x.won > x.lost ? "victoire" : "défaite"} ${x.won}–${x.lost}`).join(", ");
     const now = vs(L.matches), prev = L.previous ? vs(L.previous.matches) : [];
+    const fix = f.fix || {};
     return {
+      fixture: f, meet: fix.meet || "", note: fix.note || "", ffvb: ffvbText(f),
       code: f.code, round: f.round, title: niceTitle(L.title), team: s.opp,
       gym: f.gym ? { name: nice(f.gym), address: gymAddr ? nice(gymAddr) : "", maps: mapsUrl(f.gym, gymAddr || "Paris") } : null,
       ourColors: (teams[L.team] || {}).colors || "", theirColors: (teams[s.opp] || {}).colors || "",
@@ -89,6 +91,83 @@
       h2h: [now.length ? "cette saison " + h2hText(now) : "", prev.length ? "saison " + L.previous.season + " " + h2hText(prev) : ""].filter(Boolean).join(" · "),
     };
   }
+  /* Ce que le site FFVolley indique encore, quand l’équipe a corrigé la date, l’heure ou la salle. */
+  function ffvbText(f) {
+    const was = f.ffvb;
+    if (!was) return "";
+    return [("date" in was ? (was.date ? fmtDate(was.date, { weekday: "short", day: "numeric", month: "short" }) : "date à fixer") : ""),
+      ("time" in was && was.time ? fmtTime(was.time) : ""), ("gym" in was && was.gym ? nice(was.gym) : "")].filter(Boolean).join(" · ");
+  }
+  /* Correction d’un match de la poule : seules la date, l’heure et la salle qui diffèrent du site comptent. */
+  function fixOf(f) {
+    const was = f.ffvb || {}, fix = f.fix || {}, out = { meet: fix.meet || "", note: fix.note || "" };
+    if ("date" in was) out.date = f.date;
+    if ("time" in was) out.time = f.time;
+    if ("gym" in was) { out.gym = f.gym; out.address = (store.league.gyms || {})[f.gym] || ""; }
+    return out;
+  }
+  const siteValue = (f, k) => (f.ffvb && k in f.ffvb ? f.ffvb[k] : f[k] || "");
+  /* Enregistre la correction (changes à null : on revient aux infos du site) et, si le match existe dans
+     l’app, y reporte la date et l’heure. */
+  async function saveFix(f, changes, syncApp) {
+    const doc = changes ? Object.assign(fixOf(f), changes) : {};
+    if (doc.date === siteValue(f, "date")) delete doc.date;
+    if (doc.time === siteValue(f, "time")) delete doc.time;
+    if (doc.gym != null && C.norm(doc.gym) === C.norm(siteValue(f, "gym"))) { delete doc.gym; delete doc.address; }
+    Object.keys(doc).forEach((k) => { if (!doc[k]) delete doc[k]; });
+    const app = syncApp ? appMatchFor(f) : null;
+    const err = await api.saveLeagueFix(f.code, doc);
+    if (err) return err;
+    const g = store.league.matches.find((x) => x.code === f.code);
+    if (app && g && !isPlayed(g) && (app.date !== g.date || (app.time || "") !== g.time)) {
+      api.saveMatch(Object.assign({}, app, { date: g.date, time: g.time, updatedAt: new Date().toISOString() }));
+    }
+    return "";
+  }
+  /* Formulaire « Corriger les infos » d’un match de la poule (horaire ou salle changés, rendez-vous). */
+  function FixtureFix({ f, onDone }) {
+    const L = store.league, cur = fixOf(f);
+    const [date, setDate] = useState(f.date || "");
+    const [time, setTime] = useState(f.time || "");
+    const [meet, setMeet] = useState(cur.meet);
+    const [gym, setGym] = useState(f.gym ? (cur.gym ? f.gym : nice(f.gym)) : "");
+    const [address, setAddress] = useState(cur.address || "");
+    const [note, setNote] = useState(cur.note);
+    const [err, setErr] = useState("");
+    const [busy, setBusy] = useState(false);
+    const site = [siteValue(f, "date") ? fmtDate(siteValue(f, "date"), { weekday: "long", day: "numeric", month: "long" }) : "date à fixer",
+      siteValue(f, "time") ? fmtTime(siteValue(f, "time")) : "", siteValue(f, "gym") ? nice(siteValue(f, "gym")) : ""].filter(Boolean).join(" · ");
+    const newGym = !!gym.trim() && C.norm(gym) !== C.norm(siteValue(f, "gym"));
+    const run = async (changes) => {
+      setBusy(true);
+      const e = await saveFix(f, changes, true);
+      setBusy(false);
+      if (e) setErr(e); else onDone(changes);
+    };
+    const submit = (e) => {
+      e.preventDefault();
+      if (!date) { setErr("Indique la date du match."); return; }
+      run({ date, time, meet, note: note.trim(), gym: newGym ? gym.trim() : "", address: newGym ? address.trim() : "" });
+    };
+    return html`<form class="form" onSubmit=${submit}>
+      <p class="muted small">Pour un changement annoncé par le coach que le site FFVolley n’affiche pas encore. La correction reste en place à chaque actualisation du championnat ; dès que le site affiche la même date, la même heure et la même salle, elle s’efface toute seule.</p>
+      <p class="small">Site FFVolley : <b>${site}</b></p>
+      <div class="field-row">
+        <div class="field"><label for="fx-date"><b>Date</b></label><input id="fx-date" type="date" value=${date} onInput=${(e) => { setDate(e.target.value); setErr(""); }} /></div>
+        <div class="field"><label for="fx-time"><b>Début du match</b></label><input id="fx-time" type="time" value=${time} onInput=${(e) => setTime(e.target.value)} /></div>
+        <div class="field"><label for="fx-meet"><b>Rendez-vous</b><small>Facultatif</small></label><input id="fx-meet" type="time" value=${meet} onInput=${(e) => setMeet(e.target.value)} /></div>
+      </div>
+      <div class="field"><label for="fx-gym"><b>Salle</b></label><input id="fx-gym" value=${gym} onInput=${(e) => { setGym(e.target.value); setErr(""); }} placeholder="Ex. : Centre sportif Léon Biancotto" autocomplete="off" /></div>
+      ${newGym ? html`<div class="field"><label for="fx-addr"><b>Adresse de la salle</b><small>Pour le bouton Itinéraire</small></label><input id="fx-addr" value=${address} onInput=${(e) => setAddress(e.target.value)} placeholder="Ex. : 8 av. de la Porte de Clichy, 75017 Paris" autocomplete="off" /></div>` : null}
+      <div class="field"><label for="fx-note"><b>Message pour l’équipe</b><small>Facultatif</small></label><textarea id="fx-note" rows="2" maxlength="300" value=${note} onInput=${(e) => setNote(e.target.value)} placeholder="Ex. : changement de lieu et d’horaire"></textarea></div>
+      ${err && html`<p class="form-err" role="alert">${err}</p>`}
+      <div class="row-btns end">
+        ${f.fix ? html`<button type="button" class="btn ghost" disabled=${busy} onClick=${() => run(null)}>Revenir aux infos du site</button>` : null}
+        <button class="btn primary" type="submit" disabled=${busy}>Enregistrer</button>
+      </div>
+    </form>`;
+  }
+
   /* Crée dans l’app le match d’une journée, pour y saisir les stats (identifiant fixe : pas de doublon). */
   function createFromFixture(f) {
     const L = store.league, s = side(f, L.team), now = new Date().toISOString();
@@ -115,7 +194,7 @@
   const poolUrl = (src) => "https://www.ffvbbeach.org/ffvbapp/resu/vbspo_calendrier.php?saison=" + encodeURIComponent(src.season)
     + "&codent=" + encodeURIComponent(src.codent) + "&poule=" + encodeURIComponent(src.poule);
   const mapsUrl = (gym, address) => "https://www.google.com/maps/search/?api=1&query="
-    + encodeURIComponent([/gymnase/i.test(gym) ? nice(gym) : "Gymnase " + nice(gym), nice(address)].filter(Boolean).join(", "));
+    + encodeURIComponent([/gymnase|centre|stade|salle|complexe|halle|palais/i.test(gym) ? nice(gym) : "Gymnase " + nice(gym), nice(address)].filter(Boolean).join(", "));
   const when = (m, opts) => (m.date ? fmtDate(m.date, opts || { weekday: "short", day: "numeric", month: "short" }) : "Date à fixer") + (m.time ? " · " + fmtTime(m.time) : "");
   const setsText = (sets) => sets.map(([a, b]) => a + "-" + b).join(", ");
   function updatedText(iso) {
@@ -132,13 +211,13 @@
     </span>`;
   }
   /* Résultat d’une équipe dans un match, avec le détail des sets. */
-  function ResultLine({ s, onTeam }) {
+  function ResultLine({ s, onTeam, openSheet }) {
     const w = s.won > s.lost;
     return html`<li class="tm-line">
       <span class="tl-when">${when(s.m)}<small>${s.home ? "Domicile" : "Extérieur"}</small></span>
       <span class="tl-opp"><${TeamLogo} name=${s.opp} />${onTeam ? html`<button class="linkish" onClick=${() => onTeam(s.opp)}>${s.opp}</button>` : s.opp}</span>
       <span class=${cx("res", w ? "win" : "loss")}>${w ? "V" : "D"} ${s.won}–${s.lost}</span>
-      <span class="tl-sets">${setsText(s.sets)}</span>
+      <span class="tl-sets">${setsText(s.sets)} <${SheetPill} code=${s.m.code} openSheet=${openSheet} /></span>
     </li>`;
   }
 
@@ -161,7 +240,7 @@
       </tr>`)}</tbody>
     </table></div>`;
   }
-  function Rounds({ L, onTeam }) {
+  function Rounds({ L, onTeam, openSheet }) {
     const today = C.todayIso();
     const rounds = Array.from(new Set(L.matches.map((m) => m.round))).sort((a, b) => a - b);
     const coming = L.matches.filter((m) => !isPlayed(m) && m.date >= today).sort(byDate)[0];
@@ -184,7 +263,7 @@
         return html`<li key=${m.code} class=${cx((m.home === L.team || m.away === L.team) && "us")}>
           <span class="rl-when">${when(m)}</span>
           <span class="rl-teams"><${TeamLogo} name=${m.home} /><button class="linkish" onClick=${() => onTeam(m.home)}>${m.home}</button><i>–</i><${TeamLogo} name=${m.away} /><button class="linkish" onClick=${() => onTeam(m.away)}>${m.away}</button></span>
-          <span class="rl-score">${isPlayed(m) ? html`<b>${h}–${a}</b><small>${setsText(m.sets)}</small>` : html`<small>${m.gym ? nice(m.gym) : ""}</small>`}</span>
+          <span class="rl-score">${isPlayed(m) ? html`<b>${h}–${a}</b><small>${setsText(m.sets)}</small><${SheetPill} code=${m.code} openSheet=${openSheet} />` : html`<small>${m.gym ? nice(m.gym) : ""}</small>`}</span>
         </li>`;
       })}</ul>
       ${exempt.length ? html`<p class="muted small">Exempt : ${exempt.join(", ")}.</p>` : null}
@@ -217,9 +296,86 @@
         <${StandingsTable} rows=${rows} us=${L.team} onTeam=${onTeam} />
         <p class="muted small table-foot">Mis à jour ${updatedText(L.updatedAt)} depuis le site de la FFVolley. Clique sur une équipe pour voir sa fiche.</p>
       </section>
-      <${Rounds} L=${L} onTeam=${onTeam} />
+      <${Rounds} L=${L} onTeam=${onTeam} openSheet=${openSheet} />
       ${prev && html`<details class="card prev-season"><summary><b>Saison ${L.previous.season}</b> : classement final</summary>
         <${StandingsTable} rows=${prev} us=${L.team} compact /></details>`}
+    </div>`;
+  }
+
+  const canFix = () => store.mode === "api" && !store.readOnly;
+
+  /* ---------- Feuille de match (lue sur le site FFVolley après le match) ---------- */
+  const hasSheet = (code) => !!(store.league && (store.league.sheets || []).includes(code));
+  /* Code du match de la poule dont la feuille est lue, pour un match de l’app. */
+  function sheetCodeFor(m) {
+    const f = fixtureFor(m);
+    return f && hasSheet(f.code) ? f.code : "";
+  }
+  /* Pastille : la feuille de match de ce match a été lue ; un clic l’ouvre. */
+  function SheetPill({ code, openSheet, band }) {
+    if (!code || !hasSheet(code) || !openSheet) return null;
+    return html`<button type="button" class=${cx("sheet-pill", band && "band")} title="Infos d’après-match lues sur la feuille de match FFVolley"
+      onClick=${(e) => { e.stopPropagation(); openSheet({ type: "fdme", code }); }}><${Icon} name="list" size=${13} />Feuille de match</button>`;
+  }
+  const fdmeUrl = (src, code) => "https://www.ffvbbeach.org/ffvbapp/resu/ffvolley_fdme.php?saison=" + encodeURIComponent(src.season)
+    + "&codent=" + encodeURIComponent(src.codent) + "&codmatch=" + encodeURIComponent(code);
+  const STAFF = { E: "Entraîneur", EA: "Entraîneur adjoint" };
+  const realMin = (n) => n >= 8; // la feuille est souvent remplie après le match : horaires sans valeur
+  const fmtMin = (n) => (n >= 60 ? Math.floor(n / 60) + " h " + String(n % 60).padStart(2, "0") : n + " min");
+  function Roster({ name, r }) {
+    return html`<section class="fd-roster">
+      <h3 class="h-sub"><${TeamLogo} name=${name} size=${22} />${name}<small>${plural(r.players.length, "joueur", "joueurs")}</small></h3>
+      <table class="fd-table"><thead><tr><th scope="col">N°</th><th scope="col">Nom</th><th scope="col">Licence</th></tr></thead>
+        <tbody>${r.players.map((p) => html`<tr key=${p.num + p.lic}><td class="fd-num">${p.num}</td>
+          <td>${nice(p.name)}${p.libero ? html` <span class="fd-lib" title="Libéro">Libéro</span>` : null}</td><td class="fd-lic">${p.lic}</td></tr>`)}</tbody></table>
+      ${r.staff.length ? html`<p class="small fd-staff">${r.staff.map((x) => html`<span key=${x.role + x.lic}>${STAFF[x.role] || x.role} : <b>${nice(x.name)}</b>${x.lic ? html` <small>(licence ${x.lic})</small>` : null}</span>`)}</p>` : null}
+    </section>`;
+  }
+  function MatchSheet({ code }) {
+    const L = store.league;
+    const [d, setD] = useState(null);
+    const [err, setErr] = useState("");
+    useEffect(() => {
+      let on = true;
+      fetch("api/league/sheets/" + encodeURIComponent(code), { headers: { Accept: "application/json" } })
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((x) => { if (on) setD(x); }, () => { if (on) setErr("Feuille de match introuvable pour l’instant."); });
+      return () => { on = false; };
+    }, [code]);
+    if (err) return html`<p class="muted">${err}</p>`;
+    if (!d) return html`<p class="muted">Chargement de la feuille de match…</p>`;
+    const us = L ? L.team : "", ours = d.b === us ? "b" : "a", theirs = ours === "a" ? "b" : "a";
+    const timed = d.sets.some((s) => realMin(s.min));
+    const extra = d.sets.some((s) => s.a.to || s.b.to || s.a.subs || s.b.subs);
+    const won = (t) => d.sets.filter((s) => s[t].pts > s[t === "a" ? "b" : "a"].pts).length;
+    return html`<div class="fd">
+      <p class="fd-head"><b>${d[ours]} ${won(ours)}–${won(theirs)} ${d[theirs]}</b>
+        <span class="muted">match ${code}${timed && d.start ? " · " + fmtTime(d.start) + " → " + fmtTime(d.end) + (d.min ? " · " + fmtMin(d.min) : "") : ""}</span></p>
+      <div class="table-scroll"><table class="fd-table fd-sets">
+        <thead><tr><th scope="col">Set</th><th scope="col">Score</th><th scope="col">Service en premier</th>
+          ${timed ? html`<th scope="col">Horaires</th><th scope="col">Durée</th>` : null}
+          ${extra ? html`<th scope="col">Temps morts</th><th scope="col">Remplacements</th>` : null}</tr></thead>
+        <tbody>${d.sets.map((s) => html`<tr key=${s.n}>
+          <td>Set ${s.n}</td>
+          <td class=${cx("fd-score", s[ours].pts > s[theirs].pts ? "win" : "loss")}>${s[ours].pts}–${s[theirs].pts}</td>
+          <td>${s.serve ? d[s.serve] : "–"}</td>
+          ${timed ? html`<td>${realMin(s.min) && s.start ? fmtTime(s.start) + " → " + fmtTime(s.end) : "–"}</td><td>${realMin(s.min) ? s.min + " min" : "–"}</td>` : null}
+          ${extra ? html`<td>${s[ours].to}–${s[theirs].to}</td><td>${s[ours].subs}–${s[theirs].subs}</td>` : null}
+        </tr>`)}</tbody></table></div>
+      ${timed ? null : html`<p class="muted small">Pas d’horaires exploitables : la feuille a été remplie après le match.</p>`}
+      ${extra ? null : html`<p class="muted small">Aucun temps mort ni remplacement noté sur la feuille.</p>`}
+      <div class="fd-rosters"><${Roster} name=${d[ours]} r=${d.rosters[ours]} /><${Roster} name=${d[theirs]} r=${d.rosters[theirs]} /></div>
+      <p class="muted small">Les six de départ, les sanctions et le capitaine ne sont pas repris ici : ils ne sont pas remplis sur les feuilles de cette poule. Ils restent visibles sur la feuille officielle.</p>
+      ${L ? html`<a class="btn ghost sm" href=${fdmeUrl(L.source, code)} target="_blank" rel="noopener noreferrer">Feuille officielle (PDF)<${Icon} name="next" size=${14} /></a>` : null}
+    </div>`;
+  }
+  /* Changement saisi par l’équipe : rendez-vous, message, et ce que le site FFVolley indique encore. */
+  function FixNote({ f }) {
+    const fix = f.fix || {}, was = ffvbText(f);
+    return html`<div class="fix-note" role="note">
+      <span class="fix-badge">Changement</span>
+      <span>${fix.note ? html`<b>${fix.note}</b>` : null}${fix.meet ? html`${fix.note ? " · " : ""}Rendez-vous à <b>${fmtTime(fix.meet)}</b>` : null}
+        ${was ? html`<small>Le site FFVolley indique encore : ${was}.</small>` : null}</span>
     </div>`;
   }
 
@@ -295,11 +451,13 @@
             ${isPlayed(f) ? html`<p><span class=${cx("res", s.won > s.lost ? "win" : "loss")}>${us} ${s.won}–${s.lost}</span> <span class="tl-sets">${setsText(s.sets)}</span></p>` : null}
             ${!isPlayed(f) && f.gym ? html`<p class="vs-gym"><${Icon} name="pin" size=${16} /><span><b>${nice(f.gym)}</b>${gymAddr ? html`<br />${nice(gymAddr)}` : null}</span>
               <a class="btn ghost sm" href=${mapsUrl(f.gym, gymAddr || "Paris")} target="_blank" rel="noopener noreferrer">Itinéraire</a></p>` : null}
+            ${!isPlayed(f) && f.fix ? html`<${FixNote} f=${f} />` : null}
             ${!isPlayed(f) && (info.colors || ourInfo.colors) ? html`<p class="muted small">Maillots : ${us} ${(ourInfo.colors || "?").toLowerCase()} · ${team} ${(info.colors || "?").toLowerCase()}.</p>` : null}
             ${app ? html`<div><button class="btn ghost sm" onClick=${() => open(app)}>${isPlayed(f) ? "Ouvrir le match dans l’app" : "Voir la préparation du match"}</button></div>`
               : store.readOnly ? null
               : isPlayed(f) || (f.date && f.date <= today) ? html`<div><button class="btn primary sm" onClick=${() => open(createFromFixture(f))}>Créer ce match dans l’app pour la saisie</button></div>`
               : html`<div><button class="btn primary sm" onClick=${() => open(createFromFixture(f))}><${Icon} name="grid" size=${15} />Préparer ce match (compo, consignes)</button></div>`}
+            ${!isPlayed(f) && canFix() ? html`<div><button class="btn ghost sm" onClick=${() => openSheet({ type: "fixture-fix", code: f.code })}><${Icon} name="edit" size=${15} />Horaire ou salle changés ? Corriger</button></div>` : null}
           </div>`;
         })}
         ${prevVs.length ? html`<p class="small">Saison ${L.previous.season} : ${prevVs.map((m) => { const s = side(m, us); return `${s.won > s.lost ? "victoire" : "défaite"} ${s.won}–${s.lost} (${s.home ? "dom." : "ext."})`; }).join(" · ")}.</p>` : null}
@@ -310,7 +468,7 @@
           <span>${us} : ${c.ours.map((s) => `${s.won}–${s.lost}`).join(", ")}</span>
           <span>${team} : ${c.theirs.map((s) => `${s.won}–${s.lost}`).join(", ")}</span></li>`)}</ul></section>` : null}
       <section class="tm-block"><h3 class="h-sub">Résultats</h3>
-        ${played.length ? html`<ul class="tm-lines">${played.slice().reverse().map((s) => html`<${ResultLine} key=${s.m.code} s=${s} onTeam=${onTeam} />`)}</ul>` : html`<p class="muted small">Aucun match joué pour l’instant.</p>`}
+        ${played.length ? html`<ul class="tm-lines">${played.slice().reverse().map((s) => html`<${ResultLine} key=${s.m.code} s=${s} onTeam=${onTeam} openSheet=${openSheet} />`)}</ul>` : html`<p class="muted small">Aucun match joué pour l’instant.</p>`}
       </section>
       ${perSet.length ? html`<section class="tm-block"><h3 class="h-sub">Set par set</h3>
         <div class="table-scroll"><table class="standings compact per-set"><thead><tr><th class="st-team" scope="col">Set</th><th scope="col">Gagnés</th><th scope="col">Écart moyen</th></tr></thead>
@@ -337,5 +495,5 @@
     });
   }
 
-  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, fixtureInfo, Standings, TeamSheet, ordinal, nice };
+  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, fixtureInfo, fixtureFor, saveFix, canFix, FixtureFix, FixNote, sheetCodeFor, SheetPill, MatchSheet, Standings, TeamSheet, ordinal, nice };
 })(window);

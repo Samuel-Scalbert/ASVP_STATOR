@@ -72,7 +72,8 @@
     return p ? { view: "entry", matchId: m.id, playerId: p.id } : { view: "entry", matchId: m.id };
   }
   /* Carte d’un match sur l’accueil, en bandeau sombre ; le dernier joué a le grand score. */
-  function MatchCard({ m, me, go, featured }) {
+  function MatchCard({ m, me, go, featured, openSheet }) {
+    const LG = root.StatorLeague, fdme = LG ? LG.sheetCodeFor(m) : "";
     const comp = completion(m.id);
     const conflicts = q.conflictsOf(m.id);
     const out = !!me && !q.plays(m.id, me);
@@ -93,7 +94,7 @@
         <span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span>
         <span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${featured ? 44 : 34} /></span>
       </div>
-      <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
+      <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}${fdme ? html`<${LG.SheetPill} code=${fdme} openSheet=${openSheet} band />` : null}</div>
       <div class="hero-foot">
         ${m.noData ? null : html`<${ProgressBar} pr=${pr} comp=${comp} />`}
         <div class="hero-state">
@@ -191,8 +192,9 @@
     const hhmm = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
     const until = mins == null ? "" : mins <= 0 ? "Match en cours" : mins < 60 ? "Coup d’envoi dans " + mins + " min"
       : "Coup d’envoi dans " + Math.floor(mins / 60) + " h" + (mins % 60 ? " " + String(mins % 60).padStart(2, "0") : "");
-    const warm = P.warmup(m.time);
-    const when = [m.time ? "Match à " + fmtTime(m.time) : "Heure à préciser", warm ? "échauffement " + fmtTime(warm) : "", venueLabel(m.venue), m.competition].filter(Boolean).join(" · ");
+    const warm = P.warmup(m.time), LG = root.StatorLeague, info = LG ? LG.fixtureInfo(m) : null;
+    const when = [m.time ? "Match à " + fmtTime(m.time) : "Heure à préciser", info && info.meet ? "rendez-vous " + fmtTime(info.meet) : warm ? "échauffement " + fmtTime(warm) : "",
+      info && info.gym ? info.gym.name : venueLabel(m.venue), m.competition].filter(Boolean).join(" · ");
     const open = () => go({ view: "match", matchId: m.id });
     return html`<section class="today-hero" aria-label=${"Match du jour : " + q.us() + " contre " + m.opponent}>
       <${U.ShaderBg} />
@@ -244,12 +246,12 @@
       ${!stepsOff && html`<${Steps} onClose=${() => { setStepsOff(true); lsSet("asvp-stator-steps", true); }} />`}
       ${q.upcoming().filter((m) => m.date === C.todayIso()).map((m) => html`<${TodayCard} key=${m.id} m=${m} go=${go} />`)}
       <div class="home-layout">
-        <div class="hl-first">${first ? html`<${MatchCard} m=${first} me=${me} go=${go} featured />` : html`<section class="card empty-state">
+        <div class="hl-first">${first ? html`<${MatchCard} m=${first} me=${me} go=${go} openSheet=${openSheet} featured />` : html`<section class="card empty-state">
           <h2 class="h-sec">Aucun match joué pour l’instant</h2>
           <p>Ajoute le prochain match dans le calendrier, ou importe un ancien fichier Excel pour retrouver la saison.</p>
         </section>`}</div>
         <aside class="hl-cal" aria-label="Calendrier des matchs"><${Calendar} go=${go} openSheet=${openSheet} /></aside>
-        ${rest.length ? html`<div class="hl-rest">${rest.map((m) => html`<${MatchCard} key=${m.id} m=${m} me=${me} go=${go} />`)}</div>` : null}
+        ${rest.length ? html`<div class="hl-rest">${rest.map((m) => html`<${MatchCard} key=${m.id} m=${m} me=${me} go=${go} openSheet=${openSheet} />`)}</div>` : null}
       </div>
     </div>`;
   }
@@ -308,6 +310,11 @@
         squad: noData ? [] : squad.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b)), updatedAt: new Date().toISOString(),
       });
       api.saveMatch(doc);
+      // Match du championnat : une nouvelle date ou heure devient aussi la correction du match de la poule.
+      const LG = root.StatorLeague, f = editing && LG && LG.canFix() ? LG.fixtureFor(m) : null;
+      if (f && !f.sets.length && date && (date !== f.date || time !== f.time)) {
+        LG.saveFix(f, { date, time }, false).then((e2) => { if (e2) U.toast("Championnat non corrigé : " + e2); });
+      }
       onDone(doc, !editing);
     };
     const setRow = (i, k, v) => setRows(rows.map((x, j) => (j === i ? Object.assign({}, x, { [k]: v.replace(/[^0-9]/g, "").slice(0, 2) }) : x)));
@@ -796,7 +803,7 @@
           <div class="mb-main">
             <span class="eyebrow on-band">${fmtDate(m.date)}${m.time ? " · " + fmtTime(m.time) : ""}${venueLabel(m.venue) ? " · " + venueLabel(m.venue) : ""}${m.competition ? " · " + m.competition : ""}</span>
             <div class="board sm"><span class="board-team"><${TeamLogo} us size=${36} />${q.us()}</span><span class="board-score">${r ? r.a : "–"}<i>–</i>${r ? r.o : "–"}</span><span class="board-team opp">${m.opponent}<${TeamLogo} name=${m.opponent} size=${36} /></span></div>
-            <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}</div>
+            <div class="board-sets">${sets.length ? sets.map((s, i) => html`<span key=${i}>${s.a}–${s.o}</span>`) : html`<span class="muted-band">Score des sets non renseigné</span>`}${off ? html`<span class="muted-band">score officiel FFVolley</span>` : null}${root.StatorLeague ? html`<${root.StatorLeague.SheetPill} code=${root.StatorLeague.sheetCodeFor(m)} openSheet=${openSheet} band />` : null}</div>
             ${m.noData && html`<div class="board-sets"><${NoDataBadge} /></div>`}
             ${m.closed && !m.noData && html`<div class="board-sets"><${ClosedBadge} band /></div>`}
           </div>

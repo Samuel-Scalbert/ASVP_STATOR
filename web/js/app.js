@@ -199,6 +199,15 @@
         <${P.ConsignesEditor} m=${sheet.m} onDone=${(n) => { close(); U.toast(n ? "Consignes enregistrées." : "Consignes effacées."); }} /><//>`;
       else if (sheet.type === "team") sheetEl = html`<${Sheet} title=${sheet.team} onClose=${close} wide>
         <${LG.TeamSheet} team=${sheet.team} go=${(r) => { close(); go(r); }} openSheet=${openSheet} /><//>`;
+      else if (sheet.type === "fdme") {
+        const f = store.league && store.league.matches.find((x) => x.code === sheet.code);
+        sheetEl = html`<${Sheet} title=${"Feuille de match" + (f ? " · " + f.home + " – " + f.away : "")} onClose=${close} wide><${LG.MatchSheet} code=${sheet.code} /><//>`;
+      }
+      else if (sheet.type === "fixture-fix") {
+        const f = store.league && store.league.matches.find((x) => x.code === sheet.code);
+        sheetEl = f ? html`<${Sheet} title=${"Corriger les infos · " + f.home + " – " + f.away} onClose=${close}>
+          <${LG.FixtureFix} f=${f} onDone=${(ch) => { close(); U.toast(ch ? "Infos du match corrigées." : "Infos du site FFVolley rétablies."); }} /><//>` : null;
+      }
       else if (sheet.type === "coach-login") sheetEl = html`<${Sheet} title="Espace coach" onClose=${close}>
         <${CoachLogin} onDone=${() => { close(); U.toast("Connecté : le sélecteur d’équipe est dans le menu."); }} /><//>`;
       else if (sheet.type === "coach") sheetEl = html`<${Sheet} title="Mes équipes" onClose=${close}>

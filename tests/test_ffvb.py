@@ -112,3 +112,100 @@ def test_league_is_stored_and_served(team):
     bad = dict(doc, matches=[dict(doc["matches"][0], sets=[[25, "x"]])])
     assert team.put("/api/league", json=bad).status_code == 400
     assert team.put("/api/league", json=dict(doc, source={"season": "2026"})).status_code == 400
+
+
+def _scuf_league():
+    return {"source": {"season": "2026/2027", "codent": "PTTEST", "poule": "ARM"}, "title": "ARM - TEST", "team": "ASVP",
+            "updatedAt": "2026-11-24T06:15:00Z", "adjust": {}, "teams": {}, "previous": None,
+            "gyms": {"COURCELLES": "211 RUE DE COURCELLES, 75017 PARIS"},
+            "matches": [{"code": "ARMA038", "round": 8, "date": "2026-12-13", "time": "15:30", "home": "SCUF",
+                         "away": "ASVP", "sets": [], "gym": "COURCELLES"}]}
+
+
+def test_league_fix_survives_refresh_until_ffvb_catches_up(team):
+    doc = _scuf_league()
+    assert team.put("/api/league", json=doc).status_code == 200
+    fix = {"time": "14:30", "meet": "13:30", "gym": "Centre sportif Léon Biancotto",
+           "address": "8 av. de la Porte de Clichy, 75017 Paris", "note": "Changement de lieu et d'horaire"}
+    r = team.put("/api/league/fixes/ARMA038", json=fix)
+    assert r.status_code == 200
+    m = r.get_json()["matches"][0]
+    assert (m["time"], m["gym"], m["date"]) == ("14:30", "Centre sportif Léon Biancotto", "2026-12-13")
+    assert m["ffvb"] == {"time": "15:30", "gym": "COURCELLES"} and m["fix"]["meet"] == "13:30"
+    assert r.get_json()["gyms"]["Centre sportif Léon Biancotto"].startswith("8 av.")
+    # L'actualisation du matin (site pas encore à jour) ne touche pas à la correction.
+    assert team.put("/api/league", json=doc).get_json()["confirmed"] == []
+    assert team.get("/api/state").get_json()["league"]["matches"][0]["time"] == "14:30"
+    # Le site affiche enfin le nouvel horaire et la salle : la correction est retirée, le rendez-vous reste.
+    doc["matches"][0].update(time="14:30", gym="BIANCOTTO")
+    doc["gyms"] = {"BIANCOTTO": "8 AV. DE LA PRTE DE CLICHY, 75017 PARIS"}
+    assert team.put("/api/league", json=doc).get_json()["confirmed"] == ["ARMA038"]
+    m = team.get("/api/state").get_json()["league"]["matches"][0]
+    assert m["gym"] == "BIANCOTTO" and "ffvb" not in m and m["fix"]["meet"] == "13:30"
+    # Tout vider efface la correction.
+    m = team.put("/api/league/fixes/ARMA038", json={}).get_json()["matches"][0]
+    assert "fix" not in m
+
+
+def test_league_fix_is_checked(team):
+    team.put("/api/league", json=_scuf_league())
+    assert team.put("/api/league/fixes/ARMA999", json={"time": "14:30"}).status_code == 400
+    assert team.put("/api/league/fixes/ARMA038", json={"time": "25:00"}).status_code == 400
+    assert team.put("/api/league/fixes/ARMA038", json={"date": "13/12/2026"}).status_code == 400
+    assert team.put("/api/league/fixes/ARMA038", json={"address": "sans salle"}).status_code == 400
+    assert team.put("/f4/api/league/fixes/ARMA038", json={"time": "14:30"}).status_code == 404
+
+
+def _fake_fdme() -> bytes:
+    """Feuille de match fictive, aux positions de celles du site (seuls les textes utiles)."""
+    t = [(375, 527, "NOUS"), (450, 527, "EUX"),
+         (130, 512.7, "NOUS"), (237, 512.7, "Début: 19:27 R"), (286, 512.7, "EUX"), (401, 512.7, "Fin: 20:02 S"),
+         (465, 512.7, "EUX"), (571, 512.7, "Début: 20:02 R"), (620, 512.7, "NOUS"), (735, 512.7, "Fin: 20:33 S"),
+         (429, 147, "T"), (440, 147, "R"), (451, 147, "G"), (463, 147, "P"), (519.6, 147, "P"), (530.6, 147, "G"), (542, 147, "R"), (553.8, 147, "T"),
+         (429.2, 138.5, "1"), (440.5, 138.5, "2"), (451.9, 138.5, "1"), (461.6, 138.5, "25"), (480.2, 138.5, "1"), (500.5, 138.5, "35'"),
+         (518.2, 138.5, "21"), (531.2, 138.5, "0"), (542.6, 138.5, "0"), (553.9, 138.5, "0"),
+         (429.2, 130, "0"), (440.5, 130, "0"), (451.9, 130, "0"), (461.6, 130, "20"), (480.2, 130, "2"), (500.5, 130, "31'"),
+         (518.2, 130, "25"), (531.2, 130, "1"), (542.6, 130, "0"), (553.9, 130, "1"),
+         (488.7, 96, "Fin"), (440.2, 87.5, "19:27"), (485.6, 87.5, "20:33"), (533.4, 87.5, "1h6"),
+         (282.7, 155.8, "Licence"),
+         (578.3, 325.6, "NOUS"), (705.8, 325.6, "EUX"),
+         (578.3, 314.6, "N°"), (589.6, 314.6, "Nom Prénom"), (679.5, 314.6, "Licence"),
+         (705.9, 314.6, "N°"), (717.2, 314.6, "Nom Prénom"), (807.1, 314.6, "Licence"),
+         (578.3, 306.1, "01"), (589.6, 306.1, "JOUEUR UN"), (679.1, 306.1, "1000001"),
+         (578.3, 297.6, "05"), (589.6, 297.6, "JOUEUR CINQ"), (679.1, 297.6, "1000005"),
+         (705.9, 306.1, "07"), (717.2, 306.1, "JOUEUR SEPT"), (806.6, 306.1, "2000007"),
+         (692, 186, "LIBEROS"), (578.3, 175.7, "05"), (589.6, 175.7, "JOUEUR CINQ"), (679.1, 175.7, "1000005"),
+         (705, 147.3, "EA"), (717, 147.3, "ENTRAINEUR EUX"), (806.6, 147.3, "3000001"),
+         (578.3, 96.3, "Capitaine"), (705.8, 96.3, "Capitaine")]
+    body = "\n".join(f"BT {x:.2f} {y:.2f} Td ({s}) Tj ET" for x, y, s in t).encode("cp1252")
+    return b"%PDF-1.4\n4 0 obj\nstream\n" + zlib.compress(body) + b"\nendstream\nendobj\n"
+
+
+def test_parse_fdme():
+    d = ffvb.parse_fdme(_fake_fdme())
+    assert (d["a"], d["b"], d["start"], d["end"], d["min"]) == ("NOUS", "EUX", "19:27", "20:33", 66)
+    s1, s2 = d["sets"]
+    assert (s1["serve"], s1["start"], s1["end"], s1["a"], s1["b"]) == ("b", "19:27", "20:02", {"pts": 25, "to": 1, "subs": 2}, {"pts": 21, "to": 0, "subs": 0})
+    assert (s2["serve"], s2["a"]["pts"], s2["b"]["to"]) == ("a", 20, 1)
+    a, b = d["rosters"]["a"], d["rosters"]["b"]
+    assert a["players"] == [{"num": "01", "name": "JOUEUR UN", "lic": "1000001"},
+                            {"num": "05", "name": "JOUEUR CINQ", "lic": "1000005", "libero": True}]
+    assert b["players"] == [{"num": "07", "name": "JOUEUR SEPT", "lic": "2000007"}] and b["staff"][0]["role"] == "EA"
+    assert ffvb.parse_fdme(b"<html>pas de feuille</html>") is None
+
+
+def test_league_sheet_stored_and_served(team):
+    team.put("/api/league", json=_scuf_league())
+    sheet = ffvb.parse_fdme(_fake_fdme())
+    assert team.put("/api/league/sheets/ARMA999", json=sheet).status_code == 400
+    assert team.put("/api/league/sheets/ARMA038", json=sheet).status_code == 200
+    assert team.get("/api/state").get_json()["league"]["sheets"] == ["ARMA038"]
+    got = team.get("/api/league/sheets/ARMA038").get_json()
+    assert got["rosters"]["a"]["players"][1]["libero"] is True and got["sets"][0]["serve"] == "b"
+    bad = dict(sheet, rosters={"a": {"players": [{"num": "1x", "name": "X", "lic": ""}]}, "b": {}})
+    assert team.put("/api/league/sheets/ARMA038", json=bad).status_code == 400
+    # Le match quitte la poule (nouvelle saison) : sa feuille part avec.
+    doc = _scuf_league()
+    doc["matches"][0]["code"] = "ARMA039"
+    team.put("/api/league", json=doc)
+    assert team.get("/api/league/sheets/ARMA038").status_code == 404

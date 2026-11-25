@@ -107,8 +107,32 @@ def sheet_doc(s: StatSheet, field_by_id: dict[str, tuple[str, str]]) -> dict:
 
 
 def league_doc() -> dict | None:
+    """Championnat tel que lu sur le site FFVolley, avec les corrections de l'équipe par-dessus.
+
+    Un match corrigé garde les valeurs du site dans « ffvb » (seulement celles qui diffèrent) et porte
+    les infos ajoutées par l'équipe dans « fix » (rendez-vous, message, date de la correction)."""
     raw = get_setting("league")
-    return json.loads(raw) if raw else None
+    if not raw:
+        return None
+    league = json.loads(raw)
+    fixes = _league_fixes()
+    for m in league.get("matches", []):
+        f = fixes.get(m["code"])
+        if not f:
+            continue
+        before = {}
+        for key in ("date", "time", "gym"):
+            if f.get(key) and f[key] != m.get(key, ""):
+                before[key] = m.get(key, "")
+                m[key] = f[key]
+        if f.get("gym") and f.get("address"):
+            league.setdefault("gyms", {})[f["gym"]] = f["address"]
+        if before:
+            m["ffvb"] = before
+        m["fix"] = {k: f[k] for k in ("meet", "note", "updatedAt") if f.get(k)}
+    codes = {m["code"] for m in league.get("matches", [])}
+    league["sheets"] = sorted(c for c in _league_sheets() if c in codes)  # feuilles de match lues (détail : GET)
+    return league
 
 
 def state() -> dict:
@@ -511,5 +535,167 @@ def save_league(doc: dict) -> dict:
     s = db.session.get(Setting, "league") or Setting(key="league")
     s.value = json.dumps(clean, ensure_ascii=False, separators=(",", ":"))
     db.session.add(s)
+    confirmed = _prune_fixes(clean["matches"])
+    _prune_sheets({m["code"] for m in clean["matches"]})
     db.session.commit()
-    return clean
+    return dict(clean, confirmed=confirmed)
+
+
+# ---------------------------------------------------------------- corrections de l'équipe
+# Quand le site FFVolley tarde (changement d'horaire ou de salle annoncé par le coach), l'équipe corrige
+# un match de la poule. Les corrections sont rangées à part (réglage « league_fixes ») : l'actualisation
+# quotidienne remplace les données du site sans y toucher. Une correction que le site finit par reprendre
+# est retirée toute seule ; le rendez-vous et le message, que le site ne donne pas, restent.
+FIX_FIELDS = ("date", "time", "meet", "gym", "address", "note")
+
+
+def _league_fixes() -> dict:
+    raw = get_setting("league_fixes")
+    return json.loads(raw) if raw else {}
+
+
+def _store_fixes(fixes: dict) -> None:
+    s = db.session.get(Setting, "league_fixes") or Setting(key="league_fixes")
+    s.value = json.dumps(fixes, ensure_ascii=False, separators=(",", ":"))
+    db.session.add(s)
+
+
+def _same_gym(ffvb: str, ours: str) -> bool:
+    """« BIANCOTTO » (site FFVolley) et « Centre sportif Léon Biancotto » (saisi) : même salle."""
+    a, b = norm(ffvb), norm(ours)
+    return bool(a and b) and (a in b or b in a)
+
+
+def _prune_fixes(matches: list[dict]) -> list[str]:
+    """Après une actualisation : retire ce que le site FFVolley dit désormais pareil, et les corrections
+    de matchs qui ne sont plus dans la poule. Renvoie les codes des matchs dont la correction est reprise."""
+    fixes, by_code, confirmed = _league_fixes(), {m["code"]: m for m in matches}, []
+    if not fixes:
+        return confirmed
+    for code in list(fixes):
+        f, m = fixes[code], by_code.get(code)
+        if m is None:
+            del fixes[code]
+            continue
+        had = any(f.get(k) for k in ("date", "time", "gym"))
+        for key in ("date", "time"):
+            if f.get(key) and f[key] == m.get(key):
+                del f[key]
+        if f.get("gym") and _same_gym(m.get("gym", ""), f["gym"]):
+            f.pop("gym", None)
+            f.pop("address", None)
+        if had and not any(f.get(k) for k in ("date", "time", "gym")):
+            confirmed.append(code)
+        if not any(f.get(k) for k in FIX_FIELDS):
+            del fixes[code]
+    _store_fixes(fixes)
+    return confirmed
+
+
+def save_league_fix(code: str, doc: dict) -> dict:
+    """Corrige un match de la poule (tous les champs vides : la correction est effacée)."""
+    raw = get_setting("league")
+    site = next((m for m in json.loads(raw)["matches"] if m["code"] == code), None) if raw else None
+    if site is None:
+        raise InvalidData("Ce match n'est pas dans le championnat.")
+    day, hour, meet = (_text(doc.get(k), what, 10) for k, what in (("date", "date"), ("time", "heure"), ("meet", "heure du rendez-vous")))
+    if day:
+        _parse_date(day)
+    for value in (hour, meet):
+        if value and not TIME_RE.match(value):
+            raise InvalidData("Heure invalide : format HH:MM attendu.")
+    fix = {"date": day, "time": hour, "meet": meet, "gym": _text(doc.get("gym"), "salle", 80),
+           "address": _text(doc.get("address"), "adresse", 160), "note": _text(doc.get("note"), "message", 300)}
+    if fix["address"] and not fix["gym"]:
+        raise InvalidData("Indique le nom de la salle avec son adresse.")
+    fixes = _league_fixes()
+    fix = {k: v for k, v in fix.items() if v and not (k in ("date", "time") and v == site.get(k))}  # pareil que le site : rien à corriger
+    if fix:
+        fixes[code] = dict(fix, updatedAt=utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+    else:
+        fixes.pop(code, None)
+    _store_fixes(fixes)
+    db.session.commit()
+    return league_doc()
+
+
+# ---------------------------------------------------------------- feuilles de match (après le match)
+# Lues sur le site FFVolley par stator/ffvb.py, une fois par match joué de l'équipe, et rangées à part
+# (réglage « league_sheets ») : l'état envoyé à la page ne contient que la liste des codes, le détail
+# est demandé à l'ouverture (GET /api/league/sheets/<code>).
+NUM_RE = re.compile(r"^\d{1,2}$")
+LIC_RE = re.compile(r"^\d{0,10}$")
+
+
+def _league_sheets() -> dict:
+    raw = get_setting("league_sheets")
+    return json.loads(raw) if raw else {}
+
+
+def _store_sheets(sheets: dict) -> None:
+    s = db.session.get(Setting, "league_sheets") or Setting(key="league_sheets")
+    s.value = json.dumps(sheets, ensure_ascii=False, separators=(",", ":"))
+    db.session.add(s)
+
+
+def _prune_sheets(codes: set) -> None:
+    sheets = _league_sheets()
+    if any(c not in codes for c in sheets):
+        _store_sheets({c: v for c, v in sheets.items() if c in codes})
+
+
+def _hhmm(value, what: str) -> str:
+    value = _text(value, what, 5)
+    if value and not TIME_RE.match(value):
+        raise InvalidData(f"Feuille de match : {what} invalide.")
+    return value
+
+
+def _person(p, what: str, role: bool = False) -> dict:
+    if not isinstance(p, dict):
+        raise InvalidData(f"Feuille de match : {what} invalide.")
+    key = str(p.get("role") if role else p.get("num") or "")
+    if not (re.match(r"^[A-Z]{1,3}$", key) if role else NUM_RE.match(key)) or not LIC_RE.match(str(p.get("lic") or "")):
+        raise InvalidData(f"Feuille de match : {what} invalide.")
+    out = {"role" if role else "num": key, "name": _text(p.get("name"), what, 60, True), "lic": str(p.get("lic") or "")}
+    if not role and p.get("libero") is True:
+        out["libero"] = True
+    return out
+
+
+def save_league_sheet(code: str, doc: dict) -> dict:
+    raw = get_setting("league")
+    if not raw or code not in {m["code"] for m in json.loads(raw)["matches"]}:
+        raise InvalidData("Ce match n'est pas dans le championnat.")
+    sets = doc.get("sets") or []
+    rosters = doc.get("rosters") or {}
+    if not isinstance(sets, list) or len(sets) > 5 or not isinstance(rosters, dict):
+        raise InvalidData("Feuille de match : sets ou effectifs invalides.")
+    clean = {"a": _text(doc.get("a"), "équipe", 60, True), "b": _text(doc.get("b"), "équipe", 60, True),
+             "start": _hhmm(doc.get("start"), "heure de début"), "end": _hhmm(doc.get("end"), "heure de fin"),
+             "min": _int(doc.get("min") or 0, "Durée du match", 0, 600), "sets": [], "rosters": {}}
+    for st in sets:
+        if not isinstance(st, dict) or st.get("serve", "") not in ("", "a", "b"):
+            raise InvalidData("Feuille de match : set invalide.")
+        side = lambda t: {"pts": _int((st.get(t) or {}).get("pts") or 0, "Points", 0, 99),
+                          "to": _int((st.get(t) or {}).get("to") or 0, "Temps morts", 0, 9),
+                          "subs": _int((st.get(t) or {}).get("subs") or 0, "Remplacements", 0, 30)}
+        clean["sets"].append({"n": _int(st.get("n"), "Numéro de set", 1, 5), "min": _int(st.get("min") or 0, "Durée du set", 0, 180),
+                              "start": _hhmm(st.get("start"), "début du set"), "end": _hhmm(st.get("end"), "fin du set"),
+                              "serve": st.get("serve", ""), "a": side("a"), "b": side("b")})
+    for t in ("a", "b"):
+        r = rosters.get(t) or {}
+        players, staff = r.get("players") or [], r.get("staff") or []
+        if not isinstance(players, list) or len(players) > 30 or not isinstance(staff, list) or len(staff) > 6:
+            raise InvalidData("Feuille de match : effectif invalide.")
+        clean["rosters"][t] = {"players": [_person(p, "joueur") for p in players],
+                               "staff": [_person(p, "encadrement", role=True) for p in staff]}
+    sheets = _league_sheets()
+    sheets[code] = dict(clean, readAt=utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+    _store_sheets(sheets)
+    db.session.commit()
+    return sheets[code]
+
+
+def league_sheet(code: str) -> dict | None:
+    return _league_sheets().get(code)

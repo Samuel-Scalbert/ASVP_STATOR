@@ -10,7 +10,12 @@ sites). Ce module tourne donc ailleurs : chaque matin sur GitHub Actions
 Il lit la page de la poule (matchs, scores des sets, salles), la poule de la saison précédente, et la
 fiche PDF des prochains matchs de l'équipe (adresse de la salle, couleurs des maillots), puis remplace
 les données du championnat dans l'app (PUT /api/league). Rien d'autre n'est gardé : ni pages, ni PDF,
-ni noms de personnes. Le classement et les statistiques sont recalculés par la page à partir des scores.
+ni coordonnées. Le classement et les statistiques sont recalculés par la page à partir des scores.
+Après chaque match joué de l'équipe, il lit aussi la feuille de match électronique (effectifs avec numéros,
+noms et licences, libéros, encadrement, horaires et service de chaque set) et l'envoie une seule fois
+(PUT /api/league/sheets/<code>) ; une feuille pas encore remplie est relue les jours suivants.
+Les corrections saisies par l'équipe (horaire, salle, rendez-vous) sont rangées à part dans l'app et
+survivent à l'actualisation ; dès que le site affiche la même chose, l'app retire la correction.
 """
 from __future__ import annotations
 
@@ -212,6 +217,131 @@ def parse_fiche(lines: list[str]) -> dict:
     return out
 
 
+# ---------------------------------------------------------------- feuille de match électronique (après le match)
+_TD_TJ = re.compile(rb"BT\s+(-?[\d.]+)\s+(-?[\d.]+)\s+Td\s+\(((?:\\.|[^\\)])*)\)\s*Tj")
+
+
+def pdf_items(data: bytes) -> list[tuple[float, float, str]]:
+    """Textes d'un PDF FPDF avec leur position (x, y) : la feuille de match est un tableau, l'ordre ne suffit pas."""
+    out = []
+    for m in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", data, re.S):
+        try:
+            raw = zlib.decompress(m.group(1))
+        except zlib.error:
+            continue
+        for t in _TD_TJ.finditer(raw):
+            s = re.sub(r"\s+", " ", _pdf_string(t.group(3))).strip()
+            if s:
+                out.append((float(t.group(1)), float(t.group(2)), s))
+    return out
+
+
+def _at(items, x: float, y: float, dx: float = 4, dy: float = 1.5) -> str:
+    return next((s for ix, iy, s in items if abs(ix - x) <= dx and abs(iy - y) <= dy), "")
+
+
+def _minutes(text: str) -> int:
+    m = re.match(r"^(\d{1,3})'$", text or "")
+    return int(m.group(1)) if m else 0
+
+
+def parse_fdme(data: bytes) -> dict | None:
+    """Feuille de match électronique FFVolley -> équipes (A à gauche, B à droite), horaires, sets
+    (service en premier, durée, temps morts et remplacements comptés) et effectifs (numéro, nom, licence,
+    libéros, encadrement). Renvoie None si la feuille n'est pas encore remplie."""
+    if not data.startswith(b"%PDF"):
+        return None
+    it = pdf_items(data)
+    # En-têtes « Licence » des deux effectifs : la seule paire à la même hauteur (les arbitres en ont un aussi).
+    allc = [(x, y) for x, y, s in it if s == "Licence"]
+    lic = next((sorted([p, q], key=lambda v: v[0]) for i, p in enumerate(allc) for q in allc[i + 1:] if abs(p[1] - q[1]) < 1), None)
+    if not lic:
+        return None
+    head_y = lic[0][1]
+    cols = []  # colonnes des effectifs : (x du numéro, x du nom, x de la licence)
+    for lx, _ in lic:
+        num_x = max((x for x, y, s in it if s.startswith("N") and len(s) <= 3 and abs(y - head_y) < 1 and x < lx), default=None)
+        name_x = next((x for x, y, s in it if s.startswith("Nom") and abs(y - head_y) < 1 and num_x is not None and num_x < x < lx), None)
+        if num_x is None or name_x is None:
+            return None
+        cols.append((num_x, name_x, lx))
+    names = [_at(it, c[0], head_y + 11, dx=3, dy=2) for c in cols]
+    if not all(names):
+        return None
+    lib_y = next((y for x, y, s in it if s == "LIBEROS" and y < head_y), None)
+    cap_y = next((y for x, y, s in it if s == "Capitaine" and y < head_y), 0)
+    rosters = []
+    for num_x, name_x, lic_x in cols:
+        players, staff = [], []
+        for x, y, s in sorted(it, key=lambda i: -i[1]):
+            if abs(x - num_x) > 3 or not (cap_y < y < head_y - 3):
+                continue
+            name, licence = _at(it, name_x, y, dx=3), _at(it, lic_x, y, dx=6)
+            if re.fullmatch(r"\d{1,2}", s) and name:
+                row = {"num": s, "name": name[:60], "lic": licence if re.fullmatch(r"\d{4,10}", licence) else ""}
+                if lib_y is not None and y < lib_y:
+                    for p in players:  # les libéros sont aussi dans la liste : on les marque
+                        if p["num"] == s:
+                            p["libero"] = True
+                else:
+                    players.append(row)
+            elif re.fullmatch(r"[A-Z]{1,3}", s) and name and lib_y is not None and y < lib_y:
+                staff.append({"role": s, "name": name[:60], "lic": licence if re.fullmatch(r"\d{4,10}", licence) else ""})
+        rosters.append({"players": players[:30], "staff": staff[:6]})
+    if not rosters[0]["players"] and not rosters[1]["players"]:
+        return None
+
+    # Tableau « Résultats » : T R G P (équipe A) | set | durée | P G R T (équipe B).
+    sets = []
+    hdr = [(x, y, s) for x, y, s in it if s in ("T", "R", "G", "P") and 380 < x < 600]
+    rows_y = sorted({round(y, 1) for x, y, s in hdr})
+    head = next((y for y in rows_y if len([1 for x, yy, s in hdr if abs(yy - y) < 0.5]) == 8), None)
+    if head is not None:
+        hx = sorted(x for x, y, s in hdr if abs(y - head) < 0.5)
+        mid = (hx[3] + hx[4]) / 2
+        for x, y, s in sorted(it, key=lambda i: -i[1]):
+            if abs(x - mid + 10) > 12 or not (head - 50 < y < head - 2) or not re.fullmatch(r"[1-5]", s):
+                continue
+            val = lambda cx: _at(it, cx, y, dx=3)
+            num = lambda cx: int(val(cx)) if val(cx).isdigit() else 0
+            sets.append({"n": int(s), "min": _minutes(next((t for ix, iy, t in it if abs(iy - y) < 1 and mid < ix < hx[4] and t.endswith("'")), "")),
+                         "a": {"pts": num(hx[3]), "to": num(hx[0]), "subs": num(hx[1])},
+                         "b": {"pts": num(hx[4]), "to": num(hx[7]), "subs": num(hx[6])}})
+    # Cadres de chaque set : « Début: 19:27 R » après l'équipe de gauche, « Fin: 20:02 S » après celle de droite.
+    starts = sorted([(x, y, s) for x, y, s in it if s.startswith("D") and "but:" in s], key=lambda i: (-round(i[1]), i[0]))
+    n = 0
+    for x, y, s in starts:
+        n += 1
+        m = re.search(r"(\d{2}:\d{2})\s*([SR])?$", s)
+        end = next((t for ix, iy, t in sorted(it, key=lambda i: i[0]) if t.startswith("Fin:") and abs(iy - y) < 1 and ix > x), "")
+        left = max(((ix, t) for ix, iy, t in it if t in names and abs(iy - y) < 1 and ix < x), default=(0, ""))[1]
+        st = next((d for d in sets if d["n"] == n), None)
+        if st is None or not m:
+            continue
+        st["start"] = m.group(1)
+        me = re.search(r"(\d{2}:\d{2})", end)
+        st["end"] = me.group(1) if me else ""
+        if m.group(2) and left:
+            serves_left = m.group(2) == "S"
+            st["serve"] = ("a" if left == names[0] else "b") if serves_left else ("b" if left == names[0] else "a")
+    sets = [d for d in sets if d["a"]["pts"] or d["b"]["pts"]]
+    # Horaires du match : sous le libellé « Fin » du tableau des résultats.
+    fin = next(((x, y) for x, y, s in it if s == "Fin" and head is not None and y < head - 40), None)
+    start = end = ""
+    if fin:
+        vals = sorted([(x, s) for x, y, s in it if fin[1] - 12 < y < fin[1] - 2 and re.fullmatch(r"\d{2}:\d{2}", s)])
+        if len(vals) >= 2:
+            start, end = vals[0][1], vals[1][1]
+    return {"a": names[0], "b": names[1], "start": start, "end": end,
+            "min": sum(d["min"] for d in sets), "sets": sets, "rosters": {"a": rosters[0], "b": rosters[1]}}
+
+
+def fetch_fdme(src: dict, code: str) -> dict | None:
+    url = (f"{BASE}/resu/ffvolley_fdme.php?saison={urllib.parse.quote(src['season'])}"
+           f"&codent={src['codent']}&codmatch={code}")
+    return parse_fdme(fetch(url, {}))
+
+
 def fetch_fiche(src: dict, code: str) -> dict:
     data = fetch(f"{BASE}/adressier/fiche_match_ffvb.php",
                  {"wss_saison": src["season"], "codmatch": code, "codent": src["codent"]})
@@ -274,6 +404,24 @@ def collect(src: dict, team: str, known: dict | None = None, max_fiches: int = 6
     }
 
 
+def collect_sheets(src: dict, team: str, matches: list[dict], have: set, max_sheets: int = 8, log=print) -> dict:
+    """Feuilles de match des matchs joués de l'équipe qui ne sont pas encore dans l'app."""
+    out = {}
+    todo = [m for m in matches if team in (m["home"], m["away"]) and m["sets"] and m["code"] not in have]
+    for m in todo[:max_sheets]:
+        try:
+            sheet = fetch_fdme(src, m["code"])
+        except FfvbError as e:
+            log(f"Feuille de match {m['code']} non lue : {e}")
+            continue
+        if sheet:
+            out[m["code"]] = sheet
+        else:
+            log(f"Feuille de match {m['code']} pas encore remplie sur le site.")
+        time.sleep(1)
+    return out
+
+
 def _json(url: str, method: str = "GET", body: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method,
@@ -321,15 +469,25 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"La poule {src['poule']} n'existe pas encore pour {now} : on garde {src['season']}.")
         team = args.equipe or known.get("team") or DEFAULT_TEAM
         doc = collect(src, team, known)
+        sheets = collect_sheets(src, team, doc["matches"], set(known.get("sheets") or []))
         played = sum(1 for m in doc["matches"] if m["sets"])
         print(f"{doc['title']} ({src['season']}) : {len(doc['matches'])} matchs dont {played} joués, "
               f"{len(doc['gyms'])} salles, {len(doc['teams'])} équipes.")
         if args.essai:
             size = len(json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode())
             print(f"(essai) rien n'est envoyé ; taille du document : {size / 1024:.1f} Ko.")
+            for code, sh in sheets.items():
+                print(f"(essai) feuille {code} : {sh['a']} – {sh['b']}, {len(sh['sets'])} sets, "
+                      f"{len(sh['rosters']['a']['players'])} + {len(sh['rosters']['b']['players'])} joueurs.")
             return 0
-        _json(app + "/api/league", "PUT", doc)
+        res = _json(app + "/api/league", "PUT", doc)
         print(f"Championnat mis à jour dans l'app : {app}")
+        # Les corrections de l'équipe (horaire, salle) sont gardées par l'app ; celles que le site reprend sont retirées.
+        for code in res.get("confirmed") or []:
+            print(f"Match {code} : le site FFVolley affiche maintenant la date, l'heure et la salle corrigées par l'équipe.")
+        for code, sh in sheets.items():
+            _json(f"{app}/api/league/sheets/{code}", "PUT", sh)
+            print(f"Feuille de match {code} ajoutée : {sh['a']} – {sh['b']}.")
         return 0
     except FfvbError as e:
         print(f"Erreur : {e}", file=sys.stderr)

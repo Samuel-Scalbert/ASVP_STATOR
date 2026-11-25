@@ -7,7 +7,7 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 8;
+  const API_LEVEL = 9;
   const COLS = ["matches", "stats"];
 
   /* Les équipes partagent le même site, donc le même stockage du navigateur : chaque équipe autre que l’ASVP
@@ -291,6 +291,17 @@
       scheduleStats(doc.id, immediate);
     },
     flush,
+    /* Correction d’un match du championnat (horaire, salle, rendez-vous), gardée lors des actualisations
+       du site FFVolley. Un objet vide efface la correction. Renvoie un message d’erreur, ou "" si c’est bon. */
+    async saveLeagueFix(code, fix) {
+      if (store.mode !== "api" || store.readOnly) return "Correction impossible ici.";
+      try {
+        const res = await fetch("api/league/fixes/" + encodeURIComponent(code), { method: "PUT", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(fix) });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return body.error || "Le serveur a refusé la correction.";
+        store.league = body; emit(); return "";
+      } catch (e) { return "Serveur injoignable : vérifie la connexion."; }
+    },
     /* Profil coach : connexion (mot de passe) et déconnexion. Renvoie un message d’erreur, ou "" si c’est bon. */
     async coachLogin(password) {
       try {

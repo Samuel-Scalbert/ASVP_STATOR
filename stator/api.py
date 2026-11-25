@@ -86,3 +86,27 @@ def put_league():
     if not current_app.config["STATOR_TEAM"]["league"]:
         return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
     return jsonify(services.save_league(_body()))
+
+
+@bp.put("/league/fixes/<code>")
+def put_league_fix(code: str):
+    """Correction d'un match de la poule par l'équipe (horaire, salle, rendez-vous) : gardée lors des actualisations."""
+    if not current_app.config["STATOR_TEAM"]["league"]:
+        return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
+    return jsonify(services.save_league_fix(code, _body()))
+
+
+@bp.put("/league/sheets/<code>")
+def put_league_sheet(code: str):
+    """Feuille de match d'un match joué de l'équipe, lue sur le site FFVolley par stator/ffvb.py."""
+    if not current_app.config["STATOR_TEAM"]["league"]:
+        return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
+    return jsonify(services.save_league_sheet(code, _body()))
+
+
+@bp.get("/league/sheets/<code>")
+def get_league_sheet(code: str):
+    sheet = services.league_sheet(code) if current_app.config["STATOR_TEAM"]["league"] else None
+    if sheet is None:
+        return jsonify(error="Pas de feuille de match pour ce match."), 404
+    return jsonify(sheet)
