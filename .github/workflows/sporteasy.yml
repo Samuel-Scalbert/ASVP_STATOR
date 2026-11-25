@@ -1,0 +1,23 @@
+# Lit sur SportEasy les dispos des joueurs pour les prochains matchs et les envoie à l'app (voir stator/sporteasy.py).
+# Il faut d'abord créer les secrets SPORTEASY_EMAIL et SPORTEASY_PASSWORD du dépôt (Settings > Secrets and
+# variables > Actions) ; sans eux, le job s'arrête sans rien faire.
+name: Dispos SportEasy
+
+on:
+  schedule:
+    - cron: "0 6-21/3 * * *"   # toutes les 3 heures de 7h à 22h (heure de Paris en hiver)
+  workflow_dispatch:            # bouton « Run workflow » de l'onglet Actions, pour lire tout de suite
+
+jobs:
+  dispos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lire SportEasy et mettre à jour l'app
+        run: python3 stator/sporteasy.py
+        env:
+          STATOR_URL: ${{ vars.STATOR_URL || 'https://samuelscalbert.eu.pythonanywhere.com' }}
+          SPORTEASY_EMAIL: ${{ secrets.SPORTEASY_EMAIL }}
+          SPORTEASY_PASSWORD: ${{ secrets.SPORTEASY_PASSWORD }}
+          SPORTEASY_TEAM: ${{ vars.SPORTEASY_TEAM }}

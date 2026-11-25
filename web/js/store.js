@@ -7,7 +7,7 @@
   const C = root.StatorCore;
   const LS_DATA = "asvp-stator-data-v1";
   // Niveau d’API attendu du serveur (voir API_LEVEL dans stator/__init__.py).
-  const API_LEVEL = 10;
+  const API_LEVEL = 11;
   const COLS = ["matches", "stats"];
 
   /* Les équipes partagent le même site, donc le même stockage du navigateur : chaque équipe autre que l’ASVP
@@ -26,6 +26,7 @@
     config: null, matches: {}, stats: {},
     app: null,              // version du serveur (mode api) : { version, commit, date }
     league: null,           // championnat FFVolley (mode api) : matchs de la poule, voir stator/ffvb.py
+    sporteasy: null,        // SportEasy (mode api) : membres et réponses des prochains matchs, voir stator/sporteasy.py
     coach: null,            // profil coach (mode api) : { available, coach: { name, teams } | null }, voir stator/coach.py
     v: 0, subs: new Set(), db: null,
   };
@@ -184,6 +185,7 @@
     applyConfig(first.config);
     COLS.forEach((c) => applyCollection(c, first[c] || {}));
     store.league = first.league || null; // championnat FFVolley (lecture seule, voir stator/ffvb.py)
+    store.sporteasy = first.sporteasy || null; // dispos des prochains matchs (voir stator/sporteasy.py)
     store.coach = first.coach || null;
     store.ready = true;
     emit();
@@ -201,6 +203,7 @@
         applyConfig(s.config);
         COLS.forEach((c) => applyCollection(c, s[c] || {}));
         store.league = s.league || null;
+        store.sporteasy = s.sporteasy || null;
         store.coach = s.coach || store.coach;
         if (store.notice && store.notice.kind === "net") store.notice = null;
         emit();
@@ -300,6 +303,19 @@
         const body = await res.json().catch(() => ({}));
         if (!res.ok) return body.error || "Le serveur a refusé la correction.";
         store.league = body; emit(); return "";
+      } catch (e) { return "Serveur injoignable : vérifie la connexion."; }
+    },
+    /* SportEasy n’a pas la même date que l’app pour un match de la poule : keep = "sporteasy" ou "app".
+       Renvoie un message d’erreur, ou "" si c’est bon. */
+    async chooseSeDate(code, keep) {
+      if (store.mode !== "api" || store.readOnly) return "Impossible ici.";
+      try {
+        const res = await fetch("api/sporteasy/dates/" + encodeURIComponent(code), { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ keep }) });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return body.error || "Le serveur a refusé.";
+        store.league = body.league;
+        if (body.match) store.matches = Object.assign({}, store.matches, { [body.match.id]: body.match });
+        emit(); return "";
       } catch (e) { return "Serveur injoignable : vérifie la connexion."; }
     },
     /* Reprend dans le match de l’app les joueurs de la feuille de match (FFVolley). Renvoie { error } ou { squad }. */

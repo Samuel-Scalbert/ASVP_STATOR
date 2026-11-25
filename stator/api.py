@@ -120,3 +120,19 @@ def post_league_sheet_squad(code: str):
         return jsonify(error="Pas de match de l'app ou pas de feuille pour ce match."), 404
     squad = services.apply_sheet_squad(code, m)
     return jsonify(squad=squad, match=services.match_doc(m))
+
+
+@bp.put("/sporteasy")
+def put_sporteasy():
+    """Membres et réponses aux convocations des prochains matchs, lus sur SportEasy par stator/sporteasy.py."""
+    if not current_app.config["STATOR_TEAM"]["league"]:
+        return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
+    return jsonify(services.save_sporteasy(_body()))
+
+
+@bp.post("/sporteasy/dates/<code>")
+def post_sporteasy_date(code: str):
+    """SportEasy et l'app n'ont pas la même date pour ce match : l'équipe choisit laquelle garder."""
+    if not current_app.config["STATOR_TEAM"]["league"]:
+        return jsonify(error="Pas de championnat suivi pour cette équipe."), 404
+    return jsonify(services.choose_se_date(code, str(_body().get("keep") or "")))

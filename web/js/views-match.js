@@ -172,9 +172,10 @@
           const detail = x
             ? [fmtDate(e.date, { weekday: "long" }) + (e.time ? " " + fmtTime(e.time) : ""), x.home ? "Domicile" : "Extérieur", x.gym]
             : [fmtDate(e.date, { weekday: "long" }) + (e.time ? " " + fmtTime(e.time) : ""), venueLabel(m.venue), m.competition];
+          const fx = x ? x.f : LG ? LG.fixtureFor(m) : null; // SportEasy n’a pas la même date : la page du match demande laquelle garder
           return html`<li key=${e.key}><button type="button" class="next-row" onClick=${() => openEntry(e)}>
             <span class="next-date"><b>${Number(e.date.slice(8))}</b><small>${fmtDate(e.date, { month: "short" })}</small></span>
-            <span class="next-main"><b><${TeamLogo} name=${x ? x.opp : m.opponent} size=${20} />${x ? x.opp : m.opponent}${x && x.rank ? html` <span class="rank-chip sm">${LG.ordinal(x.rank)}</span>` : null}</b><small>${detail.filter(Boolean).join(" · ")}</small></span>
+            <span class="next-main"><b><${TeamLogo} name=${x ? x.opp : m.opponent} size=${20} />${x ? x.opp : m.opponent}${x && x.rank ? html` <span class="rank-chip sm">${LG.ordinal(x.rank)}</span>` : null}</b><small>${detail.filter(Boolean).join(" · ")}</small>${fx && fx.se ? html`<span class="se-chip">Autre date sur SportEasy</span>` : null}</span>
             <span class="next-in">${soon(k)}</span>
           </button></li>`; })}</ul>`
           : html`<p class="muted small">Aucun match prévu. Ajoute le prochain : toute l’équipe verra la date.</p>`}

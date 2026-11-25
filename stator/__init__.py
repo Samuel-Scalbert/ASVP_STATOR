@@ -28,7 +28,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT_DIR / "web"
 # Niveau de l'API : à augmenter (ici et dans web/js/store.js) quand la page envoie ou attend de nouvelles
 # données. Une page plus récente que le serveur se met alors en lecture seule au lieu de perdre des données.
-API_LEVEL = 10
+API_LEVEL = 11
 
 
 def version_info() -> dict:

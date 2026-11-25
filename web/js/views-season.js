@@ -198,6 +198,12 @@
       setNewName("");
     };
     const setPoste = (id, poste) => save({ roster: roster.map((p) => (p.id === id ? Object.assign({}, p, { poste }) : p)) });
+    // SportEasy : chaque joueur de l’effectif relié à son membre SportEasy (réglé une fois pour la saison).
+    const se = store.sporteasy;
+    const seMembers = se ? se.members.slice().sort((a, b) => a.name.localeCompare(b.name)) : [];
+    const seTaken = new Set(roster.map((p) => p.sporteasy).filter(Boolean));
+    const seFree = seMembers.filter((x) => !seTaken.has(x.id));
+    const setSe = (id, seId) => save({ roster: roster.map((p) => (p.id === id ? Object.assign({}, p, { sporteasy: seId }) : p)) });
     // Compos types du coach : réutilisées d’un match à l’autre (éditeur de compo, « Partir d’une compo type »).
     const templates = q.templates();
     const removeTemplate = (id) => save({ templates: templates.filter((t) => t.id !== id) });
@@ -214,6 +220,10 @@
               <option value="">Poste…</option>
               ${C.ROLES.map((r) => html`<option key=${r.k} value=${r.k}>${r.label}</option>`)}
             </select>
+            ${se ? html`<select id=${"rs-" + p.id} class=${cx("se-sel", !p.sporteasy && "none")} aria-label=${"Membre SportEasy de " + p.name} title="Membre SportEasy" value=${p.sporteasy || ""} disabled=${ro} onChange=${(e) => setSe(p.id, e.target.value)}>
+              <option value="">SportEasy…</option>
+              ${seMembers.map((x) => html`<option key=${x.id} value=${x.id} disabled=${seTaken.has(x.id) && x.id !== p.sporteasy}>${x.name}</option>`)}
+            </select>` : null}
             ${p.id === me && html`<span class="chip done">toi</span>`}
             <button class="btn ghost sm" disabled=${ro} onClick=${() => toggle(p.id)}>${p.active === false ? "Réintégrer" : "Retirer"}</button>
           </li>`)}
@@ -223,6 +233,10 @@
           <button class="btn dark sm" type="submit"><${Icon} name="plus" size=${16} />Ajouter</button>
         </form>`}
         <p class="muted small">${C.g("Un joueur retiré garde ses stats passées ; il n’apparaît", "Une joueuse retirée garde ses stats passées ; elle n’apparaît")} plus dans les nouveaux matchs.</p>
+        ${se ? html`<div class="se-links">
+          <p class="small"><b>SportEasy</b> : la liste à droite de chaque nom relie ${C.g("le joueur", "la joueuse")} à son compte SportEasy. Ses réponses aux convocations (dispo, absent…) remplissent alors ${C.g("les joueurs", "les joueuses")} du match avant le match. À régler une fois pour la saison.</p>
+          ${seFree.length ? html`<p class="muted small">Sur SportEasy sans ${C.g("joueur", "joueuse")} dans l’effectif : ${seFree.map((x) => x.name).join(", ")}.</p>` : null}
+        </div>` : null}
       </section>
       <section class="card">
         <div class="block-head"><h2 class="h-sec">Compos types</h2>${!ro && html`<button class="btn dark sm" onClick=${() => openSheet({ type: "lineup", template: null })}><${Icon} name="plus" size=${16} />Nouvelle compo type</button>`}</div>

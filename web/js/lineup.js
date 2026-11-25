@@ -328,6 +328,23 @@
     const [y, mo, d] = day.split("-").map(Number), [ty, tmo, td] = C.todayIso().split("-").map(Number);
     return Math.round((new Date(y, mo - 1, d) - new Date(ty, tmo - 1, td)) / 864e5);
   }
+  /* Réponses SportEasy d’un match de la poule : dispos, sans réponse, absents, non convoqués. */
+  const SE_GROUPS = [["available", "Dispos"], ["rsvp", "Sans réponse"], ["unavailable", "Absents"], ["not_selected", "Non convoqués"]];
+  function SeAnswers({ code }) {
+    const se = store.sporteasy, ev = se && code ? se.events[code] : null;
+    if (!ev) return null;
+    const who = (x) => (x.player ? q.name(x.player) : x.name);
+    const url = se.team && se.team.url ? se.team.url + "event/" + ev.id + "/" : "";
+    const n = (g) => ev.groups[g].length;
+    return html`<section class="card se-card">
+      <div class="block-head"><h2 class="h-sec">Réponses SportEasy</h2>${url ? html`<a class="btn ghost sm" href=${url} target="_blank" rel="noopener noreferrer">SportEasy<${Icon} name="next" size=${14} /></a>` : null}</div>
+      <p class="se-counts">${SE_GROUPS.filter(([g]) => g === "available" || n(g)).map(([g, label]) => html`<span key=${g} class=${"se-n se-" + g}><b>${n(g)}</b> ${label.toLowerCase()}</span>`)}</p>
+      ${SE_GROUPS.filter(([g]) => n(g)).map(([g, label]) => html`<div key=${g} class=${"se-group se-" + g}><span class="eyebrow">${label}</span>
+        <ul>${ev.groups[g].map((x, i) => html`<li key=${i} class=${x.player ? "" : "se-out"} title=${x.player ? "" : "Pas relié à un joueur de l’effectif (onglet Équipe)"}>${who(x)}</li>`)}</ul></div>`)}
+      ${!n("available") && !n("rsvp") && !n("unavailable") ? html`<p class="muted small">Personne n’a encore répondu (convocations pas encore envoyées ?).</p>` : null}
+      <p class="muted small">Lu sur SportEasy ${se.updatedAt ? "le " + new Date(se.updatedAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}, toutes les 3 heures.</p>
+    </section>`;
+  }
   const venueLabel = (v) => (v === "dom" ? "À domicile" : v === "ext" ? "À l’extérieur" : "");
   function Upcoming({ m, go, openSheet }) {
     const LG = root.StatorLeague;
@@ -363,6 +380,7 @@
         </div>
       </section>
       <div class="page wide">
+        ${info && LG.SeDateAsk ? html`<${LG.SeDateAsk} f=${info.fixture} />` : null}
         <${ConsignesCard} m=${m} openSheet=${openSheet} prominent />
         <div class="summary-grid">
         <div class="col">
@@ -393,8 +411,10 @@
             ${info.h2h ? html`<p class="small">Contre nous : ${info.h2h}</p>` : null}
             <button class="btn ghost sm" onClick=${() => openSheet({ type: "team", team: info.team })}>Fiche complète de ${m.opponent}</button>
           </section>` : null}
+          <${SeAnswers} code=${info && info.code} />
           <section class="card">
             <div class="block-head"><h2 class="h-sec">${C.g("Joueurs convoqués", "Joueuses convoquées")}</h2><span class="muted">${plural(players.length, C.g("joueur", "joueuse"), C.g("joueurs", "joueuses"))}</span></div>
+            ${q.squadOf(m.id) && info && store.sporteasy && store.sporteasy.applied.includes(info.code) ? html`<p class="muted small">D’après les dispos SportEasy, reprises à chaque nouvelle réponse. Le coach peut ajuster avec « Date, lieu, ${C.g("joueurs", "joueuses")} ».</p>` : null}
             ${q.squadOf(m.id) ? null : html`<p class="muted small">Tout l’effectif, tant que le coach n’a pas fait sa sélection (« Date, lieu, ${C.g("joueurs", "joueuses")} »).</p>`}
             <div class="up-squad">${groups.map((g) => html`<div key=${g.k} class=${"pos-" + (g.k || "none")}><span class="eyebrow"><span class="vb-dot"></span>${g.label}</span><ul>${g.players.map((p) => { const partner = partnerOf(m, p.id); return html`<li key=${p.id}>${p.name}${partner ? html`<small class="vb-pair"><${Icon} name="swap" size=${12} />${q.name(partner)}</small>` : null}</li>`; })}</ul></div>`)}</div>
           </section>

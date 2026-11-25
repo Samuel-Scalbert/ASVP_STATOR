@@ -398,6 +398,27 @@
     </div>`;
   }
 
+  /* SportEasy n’a pas la même date ou heure que l’app : on montre les deux et on demande laquelle garder. */
+  function SeDateAsk({ f }) {
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState("");
+    if (!f || !f.se) return null;
+    const txt = (d, t) => (d ? fmtDate(d, { weekday: "short", day: "numeric", month: "short" }) : "date à fixer") + (t ? " · " + fmtTime(t) : "");
+    const pick = async (keep) => { setBusy(true); setErr(await api.chooseSeDate(f.code, keep)); setBusy(false); };
+    return html`<div class="se-ask" role="group" aria-label="Date différente sur SportEasy">
+      <span class="se-badge">SportEasy</span>
+      <div>
+        <p><b>Date différente sur SportEasy.</b> Laquelle est la bonne ?</p>
+        <dl class="se-both"><div><dt>Dans l’app</dt><dd>${txt(f.date, f.time)}</dd></div><div><dt>Sur SportEasy</dt><dd>${txt(f.se.date, f.se.time)}</dd></div></dl>
+        ${canFix() ? html`<div class="row-btns">
+          <button class="btn ghost sm" disabled=${busy} onClick=${() => pick("app")}>Garder ${txt(f.date, f.time)}</button>
+          <button class="btn primary sm" disabled=${busy} onClick=${() => pick("sporteasy")}>Prendre ${txt(f.se.date, f.se.time)}</button>
+        </div>` : null}
+        ${err ? html`<p class="form-err small">${err}</p>` : null}
+      </div>
+    </div>`;
+  }
+
   /* ---------- Fiche d’une équipe (et de l’adversaire d’un prochain match) ---------- */
   function insights(team, games, L) {
     const out = [], played = games.filter(isPlayed).map((m) => side(m, team));
@@ -471,6 +492,7 @@
             ${!isPlayed(f) && f.gym ? html`<p class="vs-gym"><${Icon} name="pin" size=${16} /><span><b>${nice(f.gym)}</b>${gymAddr ? html`<br />${nice(gymAddr)}` : null}</span>
               <a class="btn ghost sm" href=${mapsUrl(f.gym, gymAddr || "Paris")} target="_blank" rel="noopener noreferrer">Itinéraire</a></p>` : null}
             ${!isPlayed(f) && f.fix ? html`<${FixNote} f=${f} />` : null}
+            ${!isPlayed(f) ? html`<${SeDateAsk} f=${f} />` : null}
             ${!isPlayed(f) && (info.colors || ourInfo.colors) ? html`<p class="muted small">Maillots : ${us} ${(ourInfo.colors || "?").toLowerCase()} · ${team} ${(info.colors || "?").toLowerCase()}.</p>` : null}
             ${app ? html`<div><button class="btn ghost sm" onClick=${() => open(app)}>${isPlayed(f) ? "Ouvrir le match dans l’app" : "Voir la préparation du match"}</button></div>`
               : store.readOnly ? null
@@ -514,5 +536,5 @@
     });
   }
 
-  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, fixtureInfo, fixtureFor, saveFix, canFix, FixtureFix, FixNote, sheetCodeFor, SheetPill, MatchSheet, Standings, TeamSheet, ordinal, nice };
+  root.StatorLeague = { table, ourFixtures, calendarFixtures, officialFor, fixtureInfo, fixtureFor, saveFix, canFix, FixtureFix, FixNote, SeDateAsk, sheetCodeFor, SheetPill, MatchSheet, Standings, TeamSheet, ordinal, nice };
 })(window);

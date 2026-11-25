@@ -60,10 +60,12 @@ def config_doc() -> dict | None:
     players = db.session.scalars(db.select(Player).order_by(Player.sort_order, Player.name)).all()
     if not players and not db.session.get(Setting, "team"):
         return None
+    links = se_links()
     return {
         "team": get_setting("team", "ASVP"),
         "season": get_setting("season"),
-        "roster": [{"id": p.id, "name": p.name, "active": p.active, **({"poste": p.poste} if p.poste else {})}
+        "roster": [{"id": p.id, "name": p.name, "active": p.active, **({"poste": p.poste} if p.poste else {}),
+                    **({"sporteasy": links[p.id]} if p.id in links else {})}
                    for p in players],
         "templates": json.loads(get_setting("lineup_templates") or "[]"),
     }
@@ -130,6 +132,7 @@ def league_doc() -> dict | None:
         if before:
             m["ffvb"] = before
         m["fix"] = {k: f[k] for k in ("meet", "note", "updatedAt") if f.get(k)}
+    _se_dates(league)
     codes = {m["code"] for m in league.get("matches", [])}
     league["sheets"] = sorted(c for c in _league_sheets() if c in codes)  # feuilles de match lues (détail : GET)
     return league
@@ -144,6 +147,7 @@ def state() -> dict:
         "matches": {m.id: match_doc(m) for m in matches},
         "stats": {s.id: sheet_doc(s, by_id) for s in sheets},
         "league": league_doc(),
+        "sporteasy": sporteasy_doc(),
     }
 
 
@@ -175,6 +179,7 @@ def save_config(doc: dict, roles: set[str]) -> None:
             raise InvalidData(f"Poste inconnu : {poste}.")
         p = ensure_player(pid, name)
         p.name, p.poste, p.active, p.sort_order = name[:120], poste, item.get("active", True) is not False, i
+    _save_links(doc.get("roster", []))
     if "templates" in doc:  # compos types du coach (une page plus ancienne ne les envoie pas : on les garde)
         ids = {item.get("id") for item in doc.get("roster", [])}
         templates = doc.get("templates") or []
@@ -697,7 +702,9 @@ def save_league_sheet(code: str, doc: dict) -> dict:
     first = code not in sheets
     sheets[code] = dict(clean, readAt=utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
     _store_sheets(sheets)
-    if first:  # feuille toute neuve : les joueurs du match de l'app deviennent ceux de la feuille
+    if first and code not in _json_setting("sporteasy_applied"):
+        # feuille toute neuve : les joueurs du match de l'app deviennent ceux de la feuille,
+        # sauf si le coach les a déjà eus avant le match par les dispos SportEasy
         m = match_for_code(code)
         if m is not None:
             apply_sheet_squad(code, m, commit=False)
@@ -731,24 +738,28 @@ def _fits(app_name: str, words: list[str]) -> bool:
     return False
 
 
-def squad_from_sheet(players: list[dict], roster: list[Player]) -> tuple[list[str], list[dict]]:
-    """Joueurs de la feuille -> (ids de l'effectif, joueurs de la feuille non reconnus)."""
-    picks: dict[int, list[Player]] = {}
-    for k, p in enumerate(players):
-        cands = [r for r in roster if _fits(r.name, _words(p["name"]))]
+def match_names(names: list[str], roster: list[Player]) -> list[str | None]:
+    """Noms d'ailleurs (feuille de match, SportEasy) -> id du joueur de l'effectif, ou None (inconnu ou ambigu)."""
+    picks: list[list[Player]] = []
+    for name in names:
+        cands = [r for r in roster if _fits(r.name, _words(name))]
         if len(cands) > 1:  # « Antoine » et « Antoine D » : le nom le plus précis l'emporte
             best = max(len(_words(r.name)) for r in cands)
             cands = [r for r in cands if len(_words(r.name)) == best]
-        picks[k] = cands
+        picks.append(cands)
     taken: dict[str, int] = {}
-    for k, cands in picks.items():
+    for cands in picks:
         if len(cands) == 1:
             taken[cands[0].id] = taken.get(cands[0].id, 0) + 1
+    return [c[0].id if len(c) == 1 and taken[c[0].id] == 1 else None for c in picks]
+
+
+def squad_from_sheet(players: list[dict], roster: list[Player]) -> tuple[list[str], list[dict]]:
+    """Joueurs de la feuille -> (ids de l'effectif, joueurs de la feuille non reconnus)."""
     ids, unknown = [], []
-    for k, p in enumerate(players):
-        cands = picks[k]
-        if len(cands) == 1 and taken[cands[0].id] == 1:
-            ids.append(cands[0].id)
+    for p, pid in zip(players, match_names([p["name"] for p in players], roster)):
+        if pid:
+            ids.append(pid)
         else:
             unknown.append({"num": p["num"], "name": p["name"]})
     return ids, unknown
@@ -791,7 +802,9 @@ def apply_sheet_squad(code: str, m: Match, commit: bool = True) -> dict:
 
 
 def _auto_squad(m: Match) -> None:
-    """Pour un match qu'on vient de créer : s'il correspond à un match de la poule dont la feuille est lue."""
+    """Pour un match qu'on vient de créer : les dispos SportEasy s'il y en a, sinon la feuille de match lue."""
+    if _se_squad_new_match(m):
+        return
     sheets = _league_sheets()
     if not sheets:
         return
@@ -806,3 +819,270 @@ def _auto_squad(m: Match) -> None:
             except InvalidData:
                 pass  # personne de reconnu : le match garde tout l'effectif
             return
+
+
+# ---------------------------------------------------------------- SportEasy : dispos avant le match
+# Les joueurs répondent aux convocations sur SportEasy. stator/sporteasy.py lit les prochains matchs de
+# l'équipe (GitHub Actions, avec le compte SportEasy rangé dans les secrets du dépôt) et envoie ici les
+# membres (id et nom, rien d'autre) et, pour chaque match, qui est dispo, sans réponse, absent ou non convoqué.
+# - La correspondance membre SportEasy -> joueur de l'effectif est proposée une fois (mêmes règles de noms
+#   que la feuille de match), puis réglée à la main dans l'Effectif : elle ne bouge plus de la saison.
+# - Avant le match, les joueurs dispos deviennent les joueurs du match de l'app (ceux qui ont déjà une fiche
+#   restent). On ne réapplique que si les dispos ont changé : un choix fait dans l'app n'est pas écrasé pour rien.
+#   Après le match, rien n'est repris de SportEasy (ni présences ni compos).
+# - Si SportEasy n'a pas la même date ou heure que l'app, la page affiche les deux et demande laquelle garder.
+SE_GROUPS = ("available", "rsvp", "unavailable", "not_selected")
+SE_ID_RE = re.compile(r"^\d{1,12}$")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _json_setting(key: str) -> dict:
+    raw = get_setting(key)
+    return json.loads(raw) if raw else {}
+
+
+def _store_json(key: str, value) -> None:
+    s = db.session.get(Setting, key) or Setting(key=key)
+    s.value = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    db.session.add(s)
+
+
+def se_links() -> dict:
+    """Joueur de l'effectif -> id du membre SportEasy."""
+    return _json_setting("sporteasy_map")
+
+
+def _save_links(items: list) -> None:
+    """Correspondances choisies dans l'Effectif. Un joueur envoyé sans le champ garde la sienne."""
+    links = se_links()
+    changed = False
+    for item in items:
+        if not isinstance(item, dict) or "sporteasy" not in item:
+            continue
+        value = str(item.get("sporteasy") or "")
+        if value and not SE_ID_RE.match(value):
+            raise InvalidData("Membre SportEasy invalide.")
+        if value:
+            links[item["id"]] = value
+        else:
+            links.pop(item["id"], None)
+        changed = True
+    if not changed:
+        return
+    owners: dict[str, str] = {}
+    for pid, se in links.items():
+        if se in owners:
+            raise InvalidData("Deux joueurs de l'effectif ne peuvent pas avoir le même membre SportEasy.")
+        owners[se] = pid
+    _store_json("sporteasy_map", links)
+
+
+def _team_key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", norm(name))
+
+
+def _se_code(ev: dict, league: dict) -> str:
+    """Match de la poule pour un match SportEasy : même adversaire et même côté (domicile ou extérieur),
+    sinon le seul match de l'équipe le même jour."""
+    us = league.get("team")
+    ours = [m for m in league.get("matches", []) if us in (m["home"], m["away"])]
+    home = ev["us"] == "home"
+    opp = _team_key(ev["away"] if home else ev["home"])
+    hits = [m for m in ours if (m["home"] == us) == home and _team_key(m["away"] if home else m["home"]) == opp]
+    if len(hits) == 1:
+        return hits[0]["code"]
+    same = [m for m in ours if ev.get("date") and m.get("date") == ev["date"]]
+    return same[0]["code"] if len(same) == 1 else ""
+
+
+def _site_league() -> dict:
+    raw = get_setting("league")
+    return json.loads(raw) if raw else {}
+
+
+def _se_available(ev: dict, owner: dict) -> list[str]:
+    """Joueurs de l'effectif dispos pour ce match, dans l'ordre de l'effectif."""
+    ids = {owner[i] for i in (ev.get("groups") or {}).get("available", []) if i in owner}
+    roster = db.session.scalars(db.select(Player).order_by(Player.sort_order, Player.name)).all()
+    return [p.id for p in roster if p.id in ids]
+
+
+def _set_squad(m: Match, ids: list[str]) -> None:
+    filled = set(db.session.scalars(db.select(StatSheet.player_id).where(StatSheet.match_id == m.id)).all())
+    keep = set(ids) | filled
+    roster = db.session.scalars(db.select(Player).order_by(Player.sort_order, Player.name)).all()
+    m.squad = ",".join(p.id for p in roster if p.id in keep)
+    db.session.add(m)
+
+
+def _apply_se_squads(doc: dict) -> list[str]:
+    """Dispos SportEasy -> joueurs des matchs de l'app à venir. Renvoie les codes des matchs mis à jour."""
+    league = _site_league()
+    if not league:
+        return []
+    owner = {v: k for k, v in se_links().items()}
+    applied, done = _json_setting("sporteasy_applied"), []
+    for ev in doc["events"]:
+        if ev["cancelled"] or ev.get("groups") is None:
+            continue
+        code = _se_code(ev, league)
+        f = next((x for x in league["matches"] if x["code"] == code), None)
+        if f is None or f["sets"]:
+            continue
+        ids = _se_available(ev, owner)
+        if not ids or applied.get(code) == ids:  # personne de dispo, ou rien de neuf depuis la dernière fois
+            continue
+        m = match_for_code(code)
+        if m is None or m.set_scores:
+            continue  # match pas encore créé dans l'app : il prendra les dispos à sa création
+        _set_squad(m, ids)
+        applied[code] = ids
+        done.append(code)
+    _store_json("sporteasy_applied", applied)
+    return done
+
+
+def _se_squad_new_match(m: Match) -> bool:
+    """Match qu'on vient de créer : prend les dispos SportEasy du match de la poule correspondant."""
+    doc, league = _json_setting("sporteasy"), _site_league()
+    if not doc or not league:
+        return False
+    owner = {v: k for k, v in se_links().items()}
+    for ev in doc.get("events", []):
+        if ev["cancelled"] or ev.get("groups") is None:
+            continue
+        code = _se_code(ev, league)
+        f = next((x for x in league["matches"] if x["code"] == code), None)
+        if f is None or f["sets"] or not (m.id == "m-" + code.lower() or (m.match_date and f.get("date") == m.match_date.isoformat())):
+            continue
+        ids = _se_available(ev, owner)
+        if not ids:
+            return False
+        _set_squad(m, ids)
+        applied = _json_setting("sporteasy_applied")
+        applied[code] = ids
+        _store_json("sporteasy_applied", applied)
+        return True
+    return False
+
+
+def _seed_links(members: list[dict]) -> int:
+    """Première lecture de SportEasy : propose la correspondance d'après les noms (à vérifier dans l'Effectif)."""
+    roster = db.session.scalars(db.select(Player).where(Player.active.is_(True)).order_by(Player.sort_order, Player.name)).all()
+    ids = match_names([x["name"] for x in members], roster)
+    links = {pid: x["id"] for x, pid in zip(members, ids) if pid}
+    if links:
+        _store_json("sporteasy_map", links)
+    return len(links)
+
+
+def save_sporteasy(doc: dict) -> dict:
+    team, members, events = doc.get("team"), doc.get("members"), doc.get("events")
+    if not isinstance(team, dict) or not SE_ID_RE.match(str(team.get("id") or "")):
+        raise InvalidData("SportEasy : équipe invalide.")
+    url = _text(team.get("url"), "adresse de l'équipe", 120)
+    if url and not re.match(r"^https://[a-z0-9-]+\.sporteasy\.net/$", url):
+        raise InvalidData("SportEasy : adresse de l'équipe invalide.")
+    if not isinstance(members, list) or len(members) > 100 or not isinstance(events, list) or len(events) > 80:
+        raise InvalidData("SportEasy : membres ou matchs invalides.")
+    clean_members = []
+    for x in members:
+        if not isinstance(x, dict) or not SE_ID_RE.match(str(x.get("id") or "")):
+            raise InvalidData("SportEasy : membre invalide.")
+        clean_members.append({"id": str(x["id"]), "name": _text(x.get("name"), "nom", 80, True)})
+    clean_events = []
+    for ev in events:
+        if not isinstance(ev, dict) or not SE_ID_RE.match(str(ev.get("id") or "")) or ev.get("us") not in ("home", "away"):
+            raise InvalidData("SportEasy : match invalide.")
+        day, hour = str(ev.get("date") or ""), str(ev.get("time") or "")
+        if (day and not DATE_RE.match(day)) or (hour and not TIME_RE.match(hour)):
+            raise InvalidData("SportEasy : date ou heure invalide.")
+        groups = ev.get("groups")
+        if groups is not None:
+            if not isinstance(groups, dict) or any(g not in SE_GROUPS for g in groups):
+                raise InvalidData("SportEasy : réponses invalides.")
+            groups = {g: [str(i) for i in ids if SE_ID_RE.match(str(i))][:100] for g, ids in groups.items() if isinstance(ids, list)}
+        clean_events.append({"id": str(ev["id"]), "date": day, "time": hour, "us": ev["us"],
+                             "home": _text(ev.get("home"), "équipe", 60, True), "away": _text(ev.get("away"), "équipe", 60, True),
+                             "cancelled": ev.get("cancelled") is True, "groups": groups})
+    clean = {"team": {"id": str(team["id"]), "name": _text(team.get("name"), "équipe", 60), "url": url},
+             "members": clean_members, "events": clean_events, "updatedAt": utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
+    _store_json("sporteasy", clean)
+    seeded = 0 if se_links() else _seed_links(clean_members)
+    squads = _apply_se_squads(clean)
+    db.session.commit()
+    league = league_doc() or {}
+    return {"members": len(clean_members), "events": len(clean_events), "linked": len(se_links()), "seeded": seeded,
+            "squads": squads, "dates": [m["code"] for m in league.get("matches", []) if m.get("se")]}
+
+
+def _se_dates(league: dict) -> None:
+    """Dans le championnat envoyé à la page : « se » sur les matchs à venir dont SportEasy donne une autre
+    date ou heure, tant que l'équipe n'a pas choisi de garder celle de l'app."""
+    doc = _json_setting("sporteasy")
+    if not doc:
+        return
+    kept = _json_setting("sporteasy_dates")
+    by_code = {m["code"]: m for m in league.get("matches", [])}
+    for ev in doc.get("events", []):
+        if ev["cancelled"] or not ev["date"]:
+            continue
+        code = _se_code(ev, league)
+        m = by_code.get(code)
+        if m is None or m["sets"]:
+            continue
+        if (ev["date"], ev["time"]) != (m.get("date", ""), m.get("time", "")) and kept.get(code) != f"{ev['date']} {ev['time']}":
+            m["se"] = {"date": ev["date"], "time": ev["time"]}
+
+
+def choose_se_date(code: str, keep: str) -> dict:
+    """Date différente sur SportEasy : « sporteasy » corrige le match avec celle de SportEasy, « app » garde
+    celle de l'app (la question revient si SportEasy change encore)."""
+    league = league_doc() or {}
+    f = next((m for m in league.get("matches", []) if m["code"] == code), None)
+    if f is None or not f.get("se"):
+        raise InvalidData("Pas de date différente sur SportEasy pour ce match.")
+    se, m = f["se"], None
+    if keep == "sporteasy":
+        site = next(x for x in _site_league()["matches"] if x["code"] == code)
+        fixes = _league_fixes()
+        fix = dict(fixes.get(code) or {})
+        for k in ("date", "time"):
+            if se[k] and se[k] != site.get(k):
+                fix[k] = se[k]
+            else:
+                fix.pop(k, None)
+        if any(fix.get(k) for k in FIX_FIELDS):
+            fixes[code] = dict(fix, updatedAt=utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))
+        else:
+            fixes.pop(code, None)
+        _store_fixes(fixes)
+        m = match_for_code(code)
+        if m is not None and not m.set_scores:
+            m.match_date, m.match_time = date.fromisoformat(se["date"]), se["time"] or m.match_time
+            db.session.add(m)
+    elif keep == "app":
+        kept = _json_setting("sporteasy_dates")
+        kept[code] = f"{se['date']} {se['time']}"
+        _store_json("sporteasy_dates", kept)
+    else:
+        raise InvalidData("Choix invalide : « sporteasy » ou « app ».")
+    db.session.commit()
+    return {"league": league_doc(), "match": match_doc(m) if m is not None else None}
+
+
+def sporteasy_doc() -> dict | None:
+    """Pour la page : membres SportEasy (correspondance dans l'Effectif) et réponses de chaque match à venir."""
+    doc = _json_setting("sporteasy")
+    if not doc:
+        return None
+    league, owner = _site_league(), {v: k for k, v in se_links().items()}
+    names = {x["id"]: x["name"] for x in doc["members"]}
+    events = {}
+    for ev in doc["events"]:
+        code = _se_code(ev, league) if league and ev.get("groups") is not None else ""
+        if code:
+            events[code] = {"id": ev["id"], "groups": {g: [{"player": owner[i]} if i in owner else {"name": names.get(i, "?")}
+                                                         for i in ev["groups"].get(g, [])] for g in SE_GROUPS}}
+    return {"team": doc["team"], "members": doc["members"], "events": events,
+            "applied": sorted(_json_setting("sporteasy_applied")), "updatedAt": doc["updatedAt"]}

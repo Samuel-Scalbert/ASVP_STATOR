@@ -132,6 +132,23 @@ le site FFVolley) : `python stator/ffvb.py --app … --poule "ADRESSE"`. Une aut
 règle dans GitHub : *Settings* › *Secrets and variables* › *Actions* › *Variables*, variable
 `STATOR_URL`.
 
+### Dispos SportEasy (avant chaque match)
+
+Le workflow [`.github/workflows/sporteasy.yml`](.github/workflows/sporteasy.yml) lit toutes les
+3 heures, sur SportEasy, les réponses aux convocations des matchs des 30 prochains jours et les envoie
+à l'app : les joueurs dispos deviennent les joueurs du match, et une date différente de celle de l'app
+est signalée sur la page du match. Il lui faut un compte SportEasy de l'équipe (un compte joueur suffit
+s'il voit les présences) :
+
+1. GitHub › *Settings* › *Secrets and variables* › *Actions* › **New repository secret** :
+   `SPORTEASY_EMAIL` puis `SPORTEASY_PASSWORD`. Ils restent chiffrés chez GitHub, jamais dans le code.
+2. Onglet **Actions** › *Dispos SportEasy* › **Run workflow**, et lire le résultat du job.
+
+Tant que les secrets n'existent pas, le job s'arrête sans rien faire. Pour tester depuis un PC (il
+demande l'e-mail et le mot de passe, sans les afficher) : `python stator/sporteasy.py --essai`.
+Seuls l'id et le nom des membres et leurs réponses sont envoyés (ni e-mail, ni téléphone).
+La correspondance joueur de l'effectif ↔ membre SportEasy se règle dans l'onglet **Équipe**.
+
 ## 7. Profil coach et équipe féminine 4x4
 
 L'équipe féminine 4x4 est servie par la même app, à l'adresse `https://TON_PSEUDO.eu.pythonanywhere.com/f4/`,
